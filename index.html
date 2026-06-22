@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="style.css" />
+    <title>26-06-20_sph_cpu_sample</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="./main.js"></script>
+    <script id="vertexShader" type="shader/x-vertex">
+      precision mediump float;
+      uniform mat4 projectionMatrix;
+      uniform mat4 modelViewMatrix;
+
+      attribute vec3 position;
+      attribute vec3 instancePosition;
+
+      void main() {
+        vec3 finalPos = position + instancePosition;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(finalPos, 1.0);
+        gl_PointSize = 2.0;
+      }
+    </script>
+    <script id="fragmentShader" type="shader/x-fragment">
+      precision mediump float;
+      void main() {
+        gl_FragColor = vec4(1.0, 0.0, 1.0, 1.0);
+      }
+    </script>
+  </body>
+</html>
