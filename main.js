@@ -1,4 +1,5 @@
 import * as THREE from "three"
+import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js"
 
 // 1. シーンの作成
 const scene = new THREE.Scene()
@@ -16,6 +17,7 @@ camera.position.z = 5
 const renderer = new THREE.WebGLRenderer()
 renderer.setSize(window.innerWidth, window.innerHeight)
 document.body.appendChild(renderer.domElement)
+const controls = new OrbitControls(camera, renderer.domElement)
 
 const geometry = new THREE.BufferGeometry()
 const material = new THREE.RawShaderMaterial({
@@ -24,7 +26,7 @@ const material = new THREE.RawShaderMaterial({
   fragmentShader: document.getElementById("fragmentShader").textContent,
 })
 
-const count = 1000
+const count = 2000
 const positions = new Float32Array(count * 3)
 const instancePositions = new Float32Array(count * 3)
 
@@ -56,37 +58,122 @@ const velocities = new Float32Array(count * 3)
 const points = new THREE.Points(geometry, material)
 scene.add(points)
 
+function calclatePressureForces() {
+  const h = 0.5
+  const restDensity = 0.5
+  const stiffness = 0.1
+
+  for (let i = 0; i < count; i++) {
+    let density = 0.0 // 密度
+
+    for (let j = 0; j < count; j++) {
+      if (i === j) continue
+
+      const dx = pos[i * 3 + 0] - pos[j * 3 + 0]
+      const dy = pos[i * 3 + 1] - pos[j * 3 + 1]
+      const dz = pos[i * 3 + 2] - pos[j * 3 + 2]
+      const distSq = dx * dx + dy * dy + dz * dz
+
+      if (distSq < h * h) {
+        const dist = Math.sqrt(distSq)
+        density += 1.0 - dist / h //密度を累計
+      }
+
+      const pressure = stiffness * (density - restDensity) // 圧力は密度に比例
+    }
+  }
+}
+
+const h = 0.5
+const densities = new Float32Array(count)
+
 // 5. アニメーションループ
 function animate() {
   requestAnimationFrame(animate)
 
-  // 速度
-  const pos = geometry.attributes.instancePosition.array
-  const gravity = -0.01
+  function computeDensity() {
+    const pos = geometry.attributes.instancePosition.array
 
-  for (let i = 0; i < count; i++) {
-    velocities[i * 3 + 1] += gravity // y方向
+    for (let i = 0; i < count; i++) {
+      let d = 0
+      for (let j = 0; j < count; j++) {
+        const dx = pos[i * 3 + 0] - pos[j * 3 + 0]
+        const dy = pos[i * 3 + 1] - pos[j * 3 + 1]
+        const dz = pos[i * 3 + 2] - pos[j * 3 + 2]
+        const distSq = dx * dx + dy * dy + dz * dz
 
-    // if (pos[i * 3 + 1] > -2.5) {
-    //   velocities[i * 3 + 0] = (Math.random() - 0.5) * 0.1
-    //   velocities[i * 3 + 2] = (Math.random() - 0.5) * 0.1
-    // } else {
-    //   velocities[i * 3 + 0] = 0
-    //   velocities[i * 3 + 2] = 0
-    // }
-
-    pos[i * 3 + 0] += velocities[i * 3 + 0]
-    pos[i * 3 + 1] += velocities[i * 3 + 1]
-    pos[i * 3 + 1] += velocities[i * 3 + 2]
-
-    if (pos[i * 3 + 1] < -2.5) {
-      pos[i * 3 + 1] = -2.5
-      velocities[i * 3 + 1] *= -0.5
+        if (distSq < h * h) {
+          const dist = Math.sqrt(distSq)
+          d += 1.0 - dist / h //密度を累計
+        }
+      }
+      densities[i] = Math.max(d, 0.0001)
     }
   }
 
+  // 圧力の係数
+  const stiffness = 0.02 // 20.0
+  const restDensity = 5.0
+
+  function applyPressureForces() {
+    const pos = geometry.attributes.instancePosition.array
+    for (let i = 0; i < count; i++) {
+      for (let j = 0; j < count; j++) {
+        const dx = pos[i * 3 + 0] - pos[j * 3 + 0]
+        const dy = pos[i * 3 + 1] - pos[j * 3 + 1]
+        const dz = pos[i * 3 + 2] - pos[j * 3 + 2]
+        const distSq = dx * dx + dy * dy + dz * dz
+
+        if (distSq < h * h && distSq > 0.0001) {
+          const dist = Math.sqrt(distSq)
+
+          // 圧力
+          const p_i = stiffness * (densities[i] - restDensity)
+          const p_j = stiffness * (densities[j] - restDensity)
+
+          // 圧力による力のベクトル（反発方向）
+          const force = (p_i + p_j) / (2.0 * densities[i] * densities[j])
+
+          // 速度に反映
+          const s = force * (1.0 - dist / h)
+          const strength = Math.min(s, 0.5)
+
+          velocities[i * 3 + 0] += (dx / dist) * strength * 0.1
+          velocities[i * 3 + 1] += (dy / dist) * strength * 0.1
+          velocities[i * 3 + 2] += (dz / dist) * strength * 0.1
+        }
+      }
+    }
+  }
+
+  computeDensity()
+  applyPressureForces()
+
+  const pos = geometry.attributes.instancePosition.array
+  for (let i = 0; i < count; i++) {
+    // 重力を追加
+    velocities[i * 3 + 1] -= 0.002
+
+    // velocities[i * 3 + 1] += gravity // y方向
+    pos[i * 3 + 0] += velocities[i * 3 + 0]
+    pos[i * 3 + 1] += velocities[i * 3 + 1]
+    pos[i * 3 + 2] += velocities[i * 3 + 2]
+
+    // 速度の減衰（少しずつエネルギーを失わせる）
+    velocities[i * 3 + 0] *= 0.999
+    velocities[i * 3 + 1] *= 0.999
+    velocities[i * 3 + 2] *= 0.999
+
+    // 3. 床（y = -2.5）での跳ね返り
+    if (pos[i * 3 + 1] < -2.5) {
+      pos[i * 3 + 1] = -2.5
+      velocities[i * 3 + 1] *= -0.5 // 跳ね返り（エネルギー減衰）
+    }
+  }
   geometry.attributes.instancePosition.needsUpdate = true
   renderer.render(scene, camera)
+  // コントロールの更新
+  controls.update()
 }
 animate()
 
