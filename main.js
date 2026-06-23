@@ -11,6 +11,7 @@ const camera = new THREE.PerspectiveCamera(
   0.1,
   1000,
 )
+camera.position.y = 3
 camera.position.z = 5
 
 // 3. レンダラーの作成
@@ -114,6 +115,8 @@ function animate() {
   // 圧力の係数
   const stiffness = 0.02 // 20.0
   const restDensity = 5.0
+  const viscosity = 0.05 //粘度
+  let do_viscosity = true
 
   function applyPressureForces() {
     const pos = geometry.attributes.instancePosition.array
@@ -141,6 +144,17 @@ function animate() {
           velocities[i * 3 + 0] += (dx / dist) * strength * 0.1
           velocities[i * 3 + 1] += (dy / dist) * strength * 0.1
           velocities[i * 3 + 2] += (dz / dist) * strength * 0.1
+
+          if (do_viscosity) {
+            // 粘度
+            const vdx = velocities[j * 3 + 0] - velocities[i * 3 + 0]
+            const vdy = velocities[j * 3 + 1] - velocities[i * 3 + 1]
+            const vdz = velocities[j * 3 + 2] - velocities[i * 3 + 2]
+
+            velocities[i * 3 + 0] += vdx * viscosity * (1.0 - dist / h)
+            velocities[i * 3 + 1] += vdy * viscosity * (1.0 - dist / h)
+            velocities[i * 3 + 2] += vdz * viscosity * (1.0 - dist / h)
+          }
         }
       }
     }
