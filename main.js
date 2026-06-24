@@ -1,230 +1,173 @@
 import * as THREE from "three"
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js"
 
-// 1. シーンの作成
-const scene = new THREE.Scene()
+// 初期設定
+const count = 2000
+const h = 0.6 // 影響範囲
+const restDensity = 2.0 // 理想密度
+const stiffness = 0.5 // 圧力係数
+const viscosity = 0.15 // 粘度係数
+const gravity = -0.005
 
-// 2. カメラの作成 (視野角, アスペクト比, 近接クリッピング, 遠方クリッピング)
+// シーン・カメラ・レンダラー等は既存のまま使用
+const scene = new THREE.Scene()
 const camera = new THREE.PerspectiveCamera(
   75,
   window.innerWidth / window.innerHeight,
   0.1,
   1000,
 )
-camera.position.y = 3
-camera.position.z = 5
-
-// 3. レンダラーの作成
+camera.position.set(0, 0, 5)
 const renderer = new THREE.WebGLRenderer()
 renderer.setSize(window.innerWidth, window.innerHeight)
 document.body.appendChild(renderer.domElement)
 const controls = new OrbitControls(camera, renderer.domElement)
 
-const geometry = new THREE.BufferGeometry()
-const material = new THREE.RawShaderMaterial({
-  uniforms: {},
-  vertexShader: document.getElementById("vertexShader").textContent,
-  fragmentShader: document.getElementById("fragmentShader").textContent,
+const STORAGE_KEY = "camera-state-data"
+let saveTimer = null // タイマー管理用
+
+/**
+ * 視点を保存する関数（デバウンス用）
+ */
+function debouncedSaveCameraState() {
+  // 既存のタイマーがあればキャンセル
+  if (saveTimer) {
+    clearTimeout(saveTimer)
+  }
+
+  // 500ms 操作が止まったら保存を実行
+  saveTimer = setTimeout(() => {
+    const state = {
+      position: {
+        x: camera.position.x,
+        y: camera.position.y,
+        z: camera.position.z,
+      },
+      target: {
+        x: controls.target.x,
+        y: controls.target.y,
+        z: controls.target.z,
+      },
+    }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+    console.log("カメラの状態を保存しました:", state)
+  }, 500)
+}
+// OrbitControls の変更イベントを監視
+controls.addEventListener("change", () => {
+  debouncedSaveCameraState()
 })
 
-const count = 2000
-const positions = new Float32Array(count * 3)
-const instancePositions = new Float32Array(count * 3)
-
+// --- 初期化時に復元（前回と同じ） ---
+window.addEventListener("DOMContentLoaded", () => {
+  const savedState = localStorage.getItem(STORAGE_KEY)
+  if (savedState) {
+    try {
+      const state = JSON.parse(savedState)
+      camera.position.set(state.position.x, state.position.y, state.position.z)
+      controls.target.set(state.target.x, state.target.y, state.target.z)
+      controls.update()
+    } catch (e) {
+      console.error("復元データが不正です:", e)
+    }
+  }
+})
+// ジオメトリ
+const geometry = new THREE.BufferGeometry()
+const posArray = new Float32Array(count * 3)
 for (let i = 0; i < count; i++) {
-  positions[i * 3 + 0] = 0
-  positions[i * 3 + 1] = 0
-  positions[i * 3 + 2] = 0
-
-  instancePositions[i * 3 + 0] = (Math.random() - 0.5) * 5 // -2.5 〜 2.5
-  instancePositions[i * 3 + 1] = (Math.random() - 0.5) * 5
-  instancePositions[i * 3 + 2] = (Math.random() - 0.5) * 5
+  // 容器の範囲内に密集させて配置
+  posArray[i * 3 + 0] = (Math.random() - 0.5) * 2.0
+  posArray[i * 3 + 1] = (Math.random() - 0.5) * 2.0
+  posArray[i * 3 + 2] = (Math.random() - 0.5) * 2.0
 }
-
-// BufferAttributeとしてgeometryに登録
-// setAttributeの名前を「instancePosition」にしてシェーダーと合わせる
-geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3))
-
-geometry.setAttribute(
-  "instancePosition",
-  new THREE.BufferAttribute(instancePositions, 3),
-)
-// ※注意: インスタンス描画を使う場合は InstancedBufferAttribute を使うのがベストですが
-// まずは「データがシェーダーに届くか」を確認するため、
-// ここでは各頂点に instancePosition を割り当てる手法（または頂点ID）で進めます。
-
-// 速度
-const velocities = new Float32Array(count * 3)
-
+geometry.setAttribute("position", new THREE.BufferAttribute(posArray, 3))
+const material = new THREE.PointsMaterial({ size: 0.05, color: 0x0077ff })
 const points = new THREE.Points(geometry, material)
 scene.add(points)
 
-function calclatePressureForces() {
-  const h = 0.5
-  const restDensity = 0.5
-  const stiffness = 0.1
-
-  for (let i = 0; i < count; i++) {
-    let density = 0.0 // 密度
-
-    for (let j = 0; j < count; j++) {
-      if (i === j) continue
-
-      const dx = pos[i * 3 + 0] - pos[j * 3 + 0]
-      const dy = pos[i * 3 + 1] - pos[j * 3 + 1]
-      const dz = pos[i * 3 + 2] - pos[j * 3 + 2]
-      const distSq = dx * dx + dy * dy + dz * dz
-
-      if (distSq < h * h) {
-        const dist = Math.sqrt(distSq)
-        // density += 1.0 - dist / h //密度を累計
-        const weight = 1.0 - dist / h
-        density += weight * weight
-      }
-
-      const pressure = stiffness * (density - restDensity) // 圧力は密度に比例
-    }
-  }
-}
-
-const h = 0.5
+const velocities = new Float32Array(count * 3)
 const densities = new Float32Array(count)
 
-// 5. アニメーションループ
 function animate() {
   requestAnimationFrame(animate)
+  const pos = geometry.attributes.position.array
 
-  function computeDensity() {
-    const pos = geometry.attributes.instancePosition.array
-
-    for (let i = 0; i < count; i++) {
-      let d = 0
-      for (let j = 0; j < count; j++) {
-        const dx = pos[i * 3 + 0] - pos[j * 3 + 0]
-        const dy = pos[i * 3 + 1] - pos[j * 3 + 1]
-        const dz = pos[i * 3 + 2] - pos[j * 3 + 2]
-        const distSq = dx * dx + dy * dy + dz * dz
-
-        if (distSq < h * h) {
-          const dist = Math.sqrt(distSq)
-          d += 1.0 - dist / h //密度を累計
-        }
-      }
-      densities[i] = Math.max(d, 0.0001)
-    }
-  }
-
-  // 圧力の係数
-  const stiffness = 0.02 // 20.0
-  const restDensity = 5.0
-  const viscosity = 0.05 //粘度
-  let do_viscosity = true
-
-  function applyPressureForces() {
-    const pos = geometry.attributes.instancePosition.array
-    for (let i = 0; i < count; i++) {
-      for (let j = 0; j < count; j++) {
-        const dx = pos[i * 3 + 0] - pos[j * 3 + 0]
-        const dy = pos[i * 3 + 1] - pos[j * 3 + 1]
-        const dz = pos[i * 3 + 2] - pos[j * 3 + 2]
-        const distSq = dx * dx + dy * dy + dz * dz
-
-        if (distSq < h * h && distSq > 0.0001) {
-          const dist = Math.sqrt(distSq)
-
-          // 圧力
-          const p_i = stiffness * (densities[i] - restDensity)
-          const p_j = stiffness * (densities[j] - restDensity)
-
-          // 圧力による力のベクトル（反発方向）
-          const force = (p_i + p_j) / (2.0 * densities[i] * densities[j])
-
-          // 速度に反映
-          // const s = force * (1.0 - dist / h)
-          const weight = 1.0 - dist / h
-          const s = force * weight * weight
-          const strength = Math.min(s, 0.5)
-
-          velocities[i * 3 + 0] += (dx / dist) * strength * 0.1
-          velocities[i * 3 + 1] += (dy / dist) * strength * 0.1
-          velocities[i * 3 + 2] += (dz / dist) * strength * 0.1
-
-          if (do_viscosity) {
-            // 粘度
-            const vdx = velocities[j * 3 + 0] - velocities[i * 3 + 0]
-            const vdy = velocities[j * 3 + 1] - velocities[i * 3 + 1]
-            const vdz = velocities[j * 3 + 2] - velocities[i * 3 + 2]
-
-            // velocities[i * 3 + 0] += vdx * viscosity * (1.0 - dist / h)
-            // velocities[i * 3 + 1] += vdy * viscosity * (1.0 - dist / h)
-            // velocities[i * 3 + 2] += vdz * viscosity * (1.0 - dist / h)
-            const weight = 1.0 - dist / h
-            velocities[i * 3 + 0] += vdx * viscosity * weight * weight
-            velocities[i * 3 + 1] += vdy * viscosity * weight * weight
-            velocities[i * 3 + 2] += vdz * viscosity * weight * weight
-          }
-        }
-      }
-    }
-  }
-
-  computeDensity()
-  applyPressureForces()
-
-  const pos = geometry.attributes.instancePosition.array
+  // 1. 密度計算
   for (let i = 0; i < count; i++) {
-    // 重力を追加
-    velocities[i * 3 + 1] -= 0.002
+    let d = 0
+    for (let j = 0; j < count; j++) {
+      const dx = pos[i * 3] - pos[j * 3],
+        dy = pos[i * 3 + 1] - pos[j * 3 + 1],
+        dz = pos[i * 3 + 2] - pos[j * 3 + 2]
+      const distSq = dx * dx + dy * dy + dz * dz
+      if (distSq < h * h) {
+        const w = 1.0 - Math.sqrt(distSq) / h
+        d += w * w // 二乗カーネル
+      }
+    }
+    densities[i] = Math.max(d, 0.0001)
+  }
 
-    // velocities[i * 3 + 1] += gravity // y方向
-    pos[i * 3 + 0] += velocities[i * 3 + 0]
+  // 2. 圧力・粘性計算
+  for (let i = 0; i < count; i++) {
+    for (let j = 0; j < count; j++) {
+      if (i === j) continue
+      const dx = pos[i * 3] - pos[j * 3],
+        dy = pos[i * 3 + 1] - pos[j * 3 + 1],
+        dz = pos[i * 3 + 2] - pos[j * 3 + 2]
+      const distSq = dx * dx + dy * dy + dz * dz
+      if (distSq < h * h && distSq > 0.0001) {
+        const dist = Math.sqrt(distSq)
+        const w = 1.0 - dist / h
+
+        // 圧力 (反発)
+        const p = stiffness * (densities[i] + densities[j] - 2 * restDensity)
+        const force = (p * w * w) / densities[j]
+        velocities[i * 3] += (dx / dist) * force * 0.01
+        velocities[i * 3 + 1] += (dy / dist) * force * 0.01
+        velocities[i * 3 + 2] += (dz / dist) * force * 0.01
+
+        // 粘性 (同期)
+        const vdx = velocities[j * 3] - velocities[i * 3]
+        const vdy = velocities[j * 3 + 1] - velocities[i * 3 + 1]
+        const vdz = velocities[j * 3 + 2] - velocities[i * 3 + 2]
+        velocities[i * 3] += vdx * viscosity * w * w
+        velocities[i * 3 + 1] += vdy * viscosity * w * w
+        velocities[i * 3 + 2] += vdz * viscosity * w * w
+      }
+    }
+  }
+
+  // 3. 物理更新と境界判定
+  for (let i = 0; i < count; i++) {
+    velocities[i * 3 + 1] += gravity
+    pos[i * 3] += velocities[i * 3]
     pos[i * 3 + 1] += velocities[i * 3 + 1]
     pos[i * 3 + 2] += velocities[i * 3 + 2]
 
-    // 速度の減衰（少しずつエネルギーを失わせる）
-    velocities[i * 3 + 0] *= 0.999
-    velocities[i * 3 + 1] *= 0.999
-    velocities[i * 3 + 2] *= 0.999
-
-    // 3. 容器の境界判定
-    const wallX = 2.0 // 左右の壁
-    const wallZ = 2.0 // 奥と手前の壁
-    const floorY = -2.5
-
-    // x, z 方向にも壁を作る
-    if (pos[i * 3 + 0] > wallX) {
-      pos[i * 3 + 0] = wallX
-      velocities[i * 3 + 0] *= -0.5
-    }
-    if (pos[i * 3 + 0] < -wallX) {
-      pos[i * 3 + 0] = -wallX
-      velocities[i * 3 + 0] *= -0.5
-    }
-    if (pos[i * 3 + 2] > wallZ) {
-      pos[i * 3 + 2] = wallZ
-      velocities[i * 3 + 2] *= -0.5
-    }
-    if (pos[i * 3 + 2] < -wallZ) {
-      pos[i * 3 + 2] = -wallZ
-      velocities[i * 3 + 2] *= -0.5
-    }
-
-    // 床の跳ね返り（既存）
-    if (pos[i * 3 + 1] < floorY) {
-      pos[i * 3 + 1] = floorY
+    // 境界判定 (床と壁)
+    if (pos[i * 3 + 1] < -2.0) {
+      pos[i * 3 + 1] = -2.0
       velocities[i * 3 + 1] *= -0.5
     }
+    if (Math.abs(pos[i * 3]) > 2.0) {
+      pos[i * 3] = Math.sign(pos[i * 3]) * 2.0
+      velocities[i * 3] *= -0.5
+    }
+    if (Math.abs(pos[i * 3 + 2]) > 2.0) {
+      pos[i * 3 + 2] = Math.sign(pos[i * 3 + 2]) * 2.0
+      velocities[i * 3 + 2] *= -0.5
+    }
+
+    // 減衰
+    velocities[i * 3] *= 0.99
+    velocities[i * 3 + 1] *= 0.99
+    velocities[i * 3 + 2] *= 0.99
   }
-  geometry.attributes.instancePosition.needsUpdate = true
+
+  geometry.attributes.position.needsUpdate = true
   renderer.render(scene, camera)
-  // コントロールの更新
   controls.update()
 }
 animate()
-
-// ウィンドウリサイズ対応
-window.addEventListener("resize", () => {
-  camera.aspect = window.innerWidth / window.innerHeight
-  camera.updateProjectionMatrix()
-  renderer.setSize(window.innerWidth, window.innerHeight)
-})
