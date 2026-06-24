@@ -2,7 +2,7 @@ import * as THREE from "three"
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js"
 
 // 初期設定
-const count = 2000
+const count = 2500
 const h = 0.6 // 影響範囲
 const restDensity = 2.0 // 理想密度
 const stiffness = 0.5 // 圧力係数
@@ -82,7 +82,12 @@ for (let i = 0; i < count; i++) {
   posArray[i * 3 + 2] = (Math.random() - 0.5) * 2.0
 }
 geometry.setAttribute("position", new THREE.BufferAttribute(posArray, 3))
-const material = new THREE.PointsMaterial({ size: 0.05, color: 0x0077ff })
+const material = new THREE.PointsMaterial({
+  size: 0.02,
+  color: 0x0077ff,
+  transparent: true,
+  opacity: 0.8,
+})
 const points = new THREE.Points(geometry, material)
 scene.add(points)
 
