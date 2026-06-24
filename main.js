@@ -77,7 +77,9 @@ function calclatePressureForces() {
 
       if (distSq < h * h) {
         const dist = Math.sqrt(distSq)
-        density += 1.0 - dist / h //密度を累計
+        // density += 1.0 - dist / h //密度を累計
+        const weight = 1.0 - dist / h
+        density += weight * weight
       }
 
       const pressure = stiffness * (density - restDensity) // 圧力は密度に比例
@@ -138,7 +140,9 @@ function animate() {
           const force = (p_i + p_j) / (2.0 * densities[i] * densities[j])
 
           // 速度に反映
-          const s = force * (1.0 - dist / h)
+          // const s = force * (1.0 - dist / h)
+          const weight = 1.0 - dist / h
+          const s = force * weight * weight
           const strength = Math.min(s, 0.5)
 
           velocities[i * 3 + 0] += (dx / dist) * strength * 0.1
@@ -151,9 +155,13 @@ function animate() {
             const vdy = velocities[j * 3 + 1] - velocities[i * 3 + 1]
             const vdz = velocities[j * 3 + 2] - velocities[i * 3 + 2]
 
-            velocities[i * 3 + 0] += vdx * viscosity * (1.0 - dist / h)
-            velocities[i * 3 + 1] += vdy * viscosity * (1.0 - dist / h)
-            velocities[i * 3 + 2] += vdz * viscosity * (1.0 - dist / h)
+            // velocities[i * 3 + 0] += vdx * viscosity * (1.0 - dist / h)
+            // velocities[i * 3 + 1] += vdy * viscosity * (1.0 - dist / h)
+            // velocities[i * 3 + 2] += vdz * viscosity * (1.0 - dist / h)
+            const weight = 1.0 - dist / h
+            velocities[i * 3 + 0] += vdx * viscosity * weight * weight
+            velocities[i * 3 + 1] += vdy * viscosity * weight * weight
+            velocities[i * 3 + 2] += vdz * viscosity * weight * weight
           }
         }
       }
@@ -178,10 +186,33 @@ function animate() {
     velocities[i * 3 + 1] *= 0.999
     velocities[i * 3 + 2] *= 0.999
 
-    // 3. 床（y = -2.5）での跳ね返り
-    if (pos[i * 3 + 1] < -2.5) {
-      pos[i * 3 + 1] = -2.5
-      velocities[i * 3 + 1] *= -0.5 // 跳ね返り（エネルギー減衰）
+    // 3. 容器の境界判定
+    const wallX = 2.0 // 左右の壁
+    const wallZ = 2.0 // 奥と手前の壁
+    const floorY = -2.5
+
+    // x, z 方向にも壁を作る
+    if (pos[i * 3 + 0] > wallX) {
+      pos[i * 3 + 0] = wallX
+      velocities[i * 3 + 0] *= -0.5
+    }
+    if (pos[i * 3 + 0] < -wallX) {
+      pos[i * 3 + 0] = -wallX
+      velocities[i * 3 + 0] *= -0.5
+    }
+    if (pos[i * 3 + 2] > wallZ) {
+      pos[i * 3 + 2] = wallZ
+      velocities[i * 3 + 2] *= -0.5
+    }
+    if (pos[i * 3 + 2] < -wallZ) {
+      pos[i * 3 + 2] = -wallZ
+      velocities[i * 3 + 2] *= -0.5
+    }
+
+    // 床の跳ね返り（既存）
+    if (pos[i * 3 + 1] < floorY) {
+      pos[i * 3 + 1] = floorY
+      velocities[i * 3 + 1] *= -0.5
     }
   }
   geometry.attributes.instancePosition.needsUpdate = true
