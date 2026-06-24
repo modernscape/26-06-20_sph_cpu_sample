@@ -22,6 +22,7 @@ const renderer = new THREE.WebGLRenderer()
 renderer.setSize(window.innerWidth, window.innerHeight)
 document.body.appendChild(renderer.domElement)
 const controls = new OrbitControls(camera, renderer.domElement)
+controls.enablePan = false
 
 const STORAGE_KEY = "camera-state-data"
 let saveTimer = null // タイマー管理用
