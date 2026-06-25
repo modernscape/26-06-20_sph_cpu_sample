@@ -2,7 +2,7 @@ import * as THREE from "three"
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js"
 
 // 初期設定
-const count = 2500
+const count = 1200
 const h = 0.6 // 影響範囲
 const restDensity = 2.0 // 理想密度
 const stiffness = 0.5 // 圧力係数
@@ -51,7 +51,7 @@ function debouncedSaveCameraState() {
       },
     }
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
-    console.log("カメラの状態を保存しました:", state)
+    // console.log("カメラの状態を保存しました:", state)
   }, 500)
 }
 // OrbitControls の変更イベントを監視
@@ -69,7 +69,7 @@ window.addEventListener("DOMContentLoaded", () => {
       controls.target.set(state.target.x, state.target.y, state.target.z)
       controls.update()
     } catch (e) {
-      console.error("復元データが不正です:", e)
+      // console.error("復元データが不正です:", e)
     }
   }
 })
@@ -84,7 +84,7 @@ for (let i = 0; i < count; i++) {
 }
 geometry.setAttribute("position", new THREE.BufferAttribute(posArray, 3))
 const material = new THREE.PointsMaterial({
-  size: 0.02,
+  size: 0.03,
   color: 0x0077ff,
   transparent: true,
   opacity: 0.8,
@@ -95,8 +95,34 @@ scene.add(points)
 const velocities = new Float32Array(count * 3)
 const densities = new Float32Array(count)
 
+// リセット用の定数
+const RESET_INTERVAL = 8000 // 5000ms = 5秒
+let lastResetTime = Date.now()
+
+// 粒子を初期化する関数
+function initParticles() {
+  for (let i = 0; i < count; i++) {
+    // 位置をランダムに戻す
+    posArray[i * 3 + 0] = (Math.random() - 0.5) * 2.0
+    posArray[i * 3 + 1] = (Math.random() - 0.5) * 2.0
+    posArray[i * 3 + 2] = (Math.random() - 0.5) * 2.0
+
+    // 速度もリセット
+    velocities[i * 3 + 0] = 0
+    velocities[i * 3 + 1] = 0
+    velocities[i * 3 + 2] = 0
+  }
+  geometry.attributes.position.needsUpdate = true
+  lastResetTime = Date.now()
+}
+
 function animate() {
   requestAnimationFrame(animate)
+  // 一定時間経過でリセット
+  if (Date.now() - lastResetTime > RESET_INTERVAL) {
+    initParticles()
+  }
+
   const pos = geometry.attributes.position.array
 
   // 1. 密度計算
@@ -171,6 +197,79 @@ function animate() {
     velocities[i * 3 + 1] *= 0.99
     velocities[i * 3 + 2] *= 0.99
   }
+
+  function computeDensity() {
+    const pos = geometry.attributes.position.array
+    const h2 = h * h // 影響範囲の二乗（計算効率のため）
+
+    for (let i = 0; i < count; i++) {
+      let d = 0
+
+      // 自分の位置を取得
+      const xi = pos[i * 3 + 0]
+      const yi = pos[i * 3 + 1]
+      const zi = pos[i * 3 + 2]
+
+      for (let j = 0; j < count; j++) {
+        // 自分自身は含めない（あるいは含めるカーネルもあるが、基本は除外）
+        if (i === j) continue
+
+        const dx = xi - pos[j * 3 + 0]
+        const dy = yi - pos[j * 3 + 1]
+        const dz = zi - pos[j * 3 + 2]
+        const distSq = dx * dx + dy * dy + dz * dz
+
+        // 影響範囲内であれば計算
+        if (distSq < h2) {
+          const dist = Math.sqrt(distSq)
+          // 二乗カーネル (1 - r/h)^2
+          const w = 1.0 - dist / h
+          d += w * w
+        }
+      }
+      // 密度が0にならないよう微小値を加算
+      densities[i] = Math.max(d, 0.0001)
+    }
+  }
+
+  // イテレーション回数（最初は2〜3で十分です）
+  const MAX_ITERATIONS = 2
+
+  function applyCorrection() {
+    // 密度が restDensity になるまで反復する
+    for (let iter = 0; iter < MAX_ITERATIONS; iter++) {
+      computeDensity() // 1. 最新の密度を計算
+
+      // 2. 圧力による力を適用
+      for (let i = 0; i < count; i++) {
+        for (let j = 0; j < count; j++) {
+          if (i === j) continue
+
+          const dx = pos[i * 3] - pos[j * 3],
+            dy = pos[i * 3 + 1] - pos[j * 3 + 1],
+            dz = pos[i * 3 + 2] - pos[j * 3 + 2]
+          const distSq = dx * dx + dy * dy + dz * dz
+
+          if (distSq < h * h && distSq > 0.0001) {
+            const dist = Math.sqrt(distSq)
+            const w = 1.0 - dist / h
+
+            // 圧力の差分を計算（密度のエラー分だけ強く反発させる）
+            const densityError = densities[i] - restDensity
+            const pressure = stiffness * densityError
+
+            // 力を適用（密度が高いほど強く弾く）
+            const force = (pressure * w * w) / densities[i]
+            velocities[i * 3] += (dx / dist) * force * 0.05
+            velocities[i * 3 + 1] += (dy / dist) * force * 0.05
+            velocities[i * 3 + 2] += (dz / dist) * force * 0.05
+          }
+        }
+      }
+    }
+  }
+  const USE_CORRECTION = window.location.search.includes("hard")
+  if (USE_CORRECTION) applyCorrection()
 
   geometry.attributes.position.needsUpdate = true
   renderer.render(scene, camera)
