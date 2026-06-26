@@ -1,6 +1,8 @@
 import * as THREE from "three"
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js"
 
+const USE_CORRECTION = window.location.search.includes("hard")
+
 // 初期設定
 const count = 1200
 const h = 0.6 // 影響範囲
@@ -85,7 +87,7 @@ for (let i = 0; i < count; i++) {
 geometry.setAttribute("position", new THREE.BufferAttribute(posArray, 3))
 const material = new THREE.PointsMaterial({
   size: 0.03,
-  color: 0x0077ff,
+  color: USE_CORRECTION ? 0xff7700 : 0x0077ff,
   transparent: true,
   opacity: 0.8,
 })
@@ -268,7 +270,7 @@ function animate() {
       }
     }
   }
-  const USE_CORRECTION = window.location.search.includes("hard")
+
   if (USE_CORRECTION) applyCorrection()
 
   geometry.attributes.position.needsUpdate = true
