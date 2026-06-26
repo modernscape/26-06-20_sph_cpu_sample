@@ -24,7 +24,7 @@ const renderer = new THREE.WebGLRenderer()
 renderer.setSize(window.innerWidth, window.innerHeight)
 document.body.appendChild(renderer.domElement)
 const controls = new OrbitControls(camera, renderer.domElement)
-controls.enablePan = false
+// controls.enablePan = false
 
 const STORAGE_KEY = "camera-state-data"
 let saveTimer = null // タイマー管理用
@@ -91,6 +91,7 @@ const material = new THREE.PointsMaterial({
   transparent: true,
   opacity: 0.8,
 })
+
 const points = new THREE.Points(geometry, material)
 scene.add(points)
 
