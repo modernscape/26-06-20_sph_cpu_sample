@@ -3,8 +3,55 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js"
 
 const USE_CORRECTION = window.location.search.includes("hard")
 
+const addBtn = document.getElementById("addBtn")
+addBtn.addEventListener("click", () => {
+  const addCount = 10
+  for (let i = 0; i < addCount; i++) {
+    addParticle()
+  }
+})
+
+function addParticle() {
+  // 1. 配列を拡張（現在の処理と同じ）
+  const newPosArray = new Float32Array(posArray.length + 3)
+  newPosArray.set(posArray)
+  // newPosArray[posArray.length + 0] = (Math.random() - 0.2) * 2.0
+  newPosArray[posArray.length + 0] = 0.0
+  newPosArray[posArray.length + 1] = 2.0 // 少し高い位置から
+  // newPosArray[posArray.length + 2] = (Math.random() - 0.2) * 2.0
+  newPosArray[posArray.length + 2] = 0.0
+  posArray = newPosArray
+
+  const newVelocities = new Float32Array(velocities.length + 3)
+  newVelocities.set(velocities)
+  newVelocities[velocities.length + 0] = 0
+  newVelocities[velocities.length + 1] = -0.02 // 下向きの初速
+  newVelocities[velocities.length + 2] = 0
+  velocities = newVelocities
+
+  // 2. densities 配列も拡張する！
+  const newDensities = new Float32Array(count + 1)
+  newDensities.set(densities)
+  newDensities[count] = restDensity // 初期値を設定
+  densities = newDensities
+
+  // 2. 粒子数を更新
+  count += 1
+
+  // 3. Three.js に「頂点数が増えたこと」を伝えてバッファを再生成
+  geometry.setAttribute("position", new THREE.BufferAttribute(posArray, 3))
+
+  // 必要であれば色などの属性も再セットしてください
+  // geometry.setAttribute("color", new THREE.BufferAttribute(newColors, 3))
+
+  // 4. フラグを立てる
+  geometry.attributes.position.needsUpdate = true
+
+  console.log("現在数:", count)
+}
+
 // 初期設定
-const count = 1200
+let count = 1200
 const h = 0.6 // 影響範囲
 const restDensity = 2.0 // 理想密度
 const stiffness = 0.5 // 圧力係数
@@ -77,10 +124,10 @@ window.addEventListener("DOMContentLoaded", () => {
 })
 // ジオメトリ
 const geometry = new THREE.BufferGeometry()
-const posArray = new Float32Array(count * 3)
+let posArray = new Float32Array(count * 3)
 for (let i = 0; i < count; i++) {
   // 容器の範囲内に密集させて配置
-  posArray[i * 3 + 0] = (Math.random() - 0.5) * 2.0
+  posArray[i * 3 + 0] = (Math.random() - 0.5) * 2.0 // -1 〜 1
   posArray[i * 3 + 1] = (Math.random() - 0.5) * 2.0
   posArray[i * 3 + 2] = (Math.random() - 0.5) * 2.0
 }
@@ -95,8 +142,8 @@ const material = new THREE.PointsMaterial({
 const points = new THREE.Points(geometry, material)
 scene.add(points)
 
-const velocities = new Float32Array(count * 3)
-const densities = new Float32Array(count)
+let velocities = new Float32Array(count * 3)
+let densities = new Float32Array(count)
 
 // リセット用の定数
 const RESET_INTERVAL = 8000 // 5000ms = 5秒
@@ -119,12 +166,13 @@ function initParticles() {
   lastResetTime = Date.now()
 }
 
+initParticles()
 function animate() {
   requestAnimationFrame(animate)
   // 一定時間経過でリセット
-  if (Date.now() - lastResetTime > RESET_INTERVAL) {
-    initParticles()
-  }
+  // if (Date.now() - lastResetTime > RESET_INTERVAL) {
+  //   initParticles()
+  // }
 
   const pos = geometry.attributes.position.array
 
@@ -272,10 +320,13 @@ function animate() {
     }
   }
 
+  // console.log(posArray.length)
+
   if (USE_CORRECTION) applyCorrection()
 
   geometry.attributes.position.needsUpdate = true
   renderer.render(scene, camera)
   controls.update()
 }
+
 animate()
