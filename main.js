@@ -1,25 +1,39 @@
 import * as THREE from "three"
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js"
 
-const USE_CORRECTION = window.location.search.includes("hard")
+let msg = ""
+const params = new URLSearchParams(window.location.search)
+const case_value = params.get("case")
+switch (case_value) {
+  case "hard":
+    msg = "流体の非圧縮性"
+    break
+  case "02":
+    msg = "流体の非圧縮性"
+    break
+  default:
+    msg = "default"
+    break
+}
+
+document.getElementById("msgSpan").textContent = msg
 
 const addBtn = document.getElementById("addBtn")
 addBtn.addEventListener("click", () => {
-  const addCount = 10
+  const addCount = 1
   for (let i = 0; i < addCount; i++) {
     addParticle()
   }
 })
 
 function addParticle() {
-  // 1. 配列を拡張（現在の処理と同じ）
   const newPosArray = new Float32Array(posArray.length + 3)
   newPosArray.set(posArray)
-  // newPosArray[posArray.length + 0] = (Math.random() - 0.2) * 2.0
-  newPosArray[posArray.length + 0] = 0.0
+  const range = 0.2
+  newPosArray[posArray.length + 0] = (Math.random() - range) * (range * 2)
   newPosArray[posArray.length + 1] = 2.0 // 少し高い位置から
-  // newPosArray[posArray.length + 2] = (Math.random() - 0.2) * 2.0
-  newPosArray[posArray.length + 2] = 0.0
+  newPosArray[posArray.length + 2] = (Math.random() - range) * (range * 2)
+
   posArray = newPosArray
 
   const newVelocities = new Float32Array(velocities.length + 3)
@@ -134,7 +148,7 @@ for (let i = 0; i < count; i++) {
 geometry.setAttribute("position", new THREE.BufferAttribute(posArray, 3))
 const material = new THREE.PointsMaterial({
   size: 0.03,
-  color: USE_CORRECTION ? 0xff7700 : 0x0077ff,
+  color: case_value == "hard" ? 0xff7700 : 0x0077ff,
   transparent: true,
   opacity: 0.8,
 })
@@ -322,7 +336,7 @@ function animate() {
 
   // console.log(posArray.length)
 
-  if (USE_CORRECTION) applyCorrection()
+  if (case_value == "hard") applyCorrection()
 
   geometry.attributes.position.needsUpdate = true
   renderer.render(scene, camera)

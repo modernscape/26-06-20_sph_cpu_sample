@@ -11,10 +11,20 @@
         margin: 10px;
         padding: 2px 5px;
       }
+      #msgSpan {
+        position: absolute;
+        color: #fff;
+        right: 0;
+        padding: 3px 10px;
+        opacity: 0.8;
+        font-family: serif;
+        font-size: 24px;
+      }
     </style>
   </head>
   <body>
     <input type="button" value="add" id="addBtn" />
+    <span id="msgSpan"></span>
     <div id="app"></div>
     <script type="module" src="./main.js"></script>
     <script id="vertexShader" type="shader/x-vertex">
