@@ -11,20 +11,36 @@
         margin: 10px;
         padding: 2px 5px;
       }
-      #msgSpan {
+      /* #msgSpan {
         position: absolute;
         color: #fff;
         right: 0;
         padding: 3px 10px;
+      } */
+      /* #count {
+        position: absolute;
+      } */
+      #info-area {
+        position: absolute;
+        right: 0;
         opacity: 0.8;
         font-family: serif;
         font-size: 24px;
+        color: #fff;
+        padding: 3px 10px;
+        text-align: right;
+      }
+      #info-area span {
+        display: block;
       }
     </style>
   </head>
   <body>
     <input type="button" value="add" id="addBtn" />
-    <span id="msgSpan"></span>
+    <div id="info-area">
+      <span id="msgSpan"></span>
+      <span id="count"></span>
+    </div>
     <div id="app"></div>
     <script type="module" src="./main.js"></script>
     <script id="vertexShader" type="shader/x-vertex">

@@ -5,14 +5,14 @@ let msg = ""
 const params = new URLSearchParams(window.location.search)
 const case_value = params.get("case")
 switch (case_value) {
-  case "hard":
-    msg = "流体の非圧縮性"
+  case "soft":
+    msg = "流体の圧縮版"
     break
   case "02":
     msg = "02"
     break
   default:
-    msg = "default"
+    // msg = "default"
     break
 }
 
@@ -20,7 +20,7 @@ document.getElementById("msgSpan").textContent = msg
 
 const addBtn = document.getElementById("addBtn")
 addBtn.addEventListener("click", () => {
-  const addCount = 1
+  const addCount = 3
   for (let i = 0; i < addCount; i++) {
     addParticle()
   }
@@ -39,7 +39,7 @@ function addParticle() {
   const newVelocities = new Float32Array(velocities.length + 3)
   newVelocities.set(velocities)
   newVelocities[velocities.length + 0] = 0
-  newVelocities[velocities.length + 1] = -0.02 // 下向きの初速
+  newVelocities[velocities.length + 1] = -0.05 // 下向きの初速
   newVelocities[velocities.length + 2] = 0
   velocities = newVelocities
 
@@ -51,6 +51,7 @@ function addParticle() {
 
   // 2. 粒子数を更新
   count += 1
+  showCount()
 
   // 3. Three.js に「頂点数が増えたこと」を伝えてバッファを再生成
   geometry.setAttribute("position", new THREE.BufferAttribute(posArray, 3))
@@ -64,8 +65,13 @@ function addParticle() {
   console.log("現在数:", count)
 }
 
+function showCount() {
+  const c = document.getElementById("count")
+  c.textContent = count / 3
+}
+
 // 初期設定
-let count = 1200
+let count = 1500
 const h = 0.6 // 影響範囲
 const restDensity = 2.0 // 理想密度
 const stiffness = 0.5 // 圧力係数
@@ -114,7 +120,6 @@ function debouncedSaveCameraState() {
       },
     }
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
-    // console.log("カメラの状態を保存しました:", state)
   }, 500)
 }
 // OrbitControls の変更イベントを監視
@@ -148,7 +153,8 @@ for (let i = 0; i < count; i++) {
 geometry.setAttribute("position", new THREE.BufferAttribute(posArray, 3))
 const material = new THREE.PointsMaterial({
   size: 0.03,
-  color: case_value == "hard" ? 0xff7700 : 0x0077ff,
+  color: case_value == "soft" ? 0x0077ff : 0xff7700,
+  // color: 0xff7700,
   transparent: true,
   opacity: 0.8,
 })
@@ -181,6 +187,7 @@ function initParticles() {
 }
 
 initParticles()
+showCount()
 function animate() {
   requestAnimationFrame(animate)
   // 一定時間経過でリセット
@@ -336,7 +343,9 @@ function animate() {
 
   // console.log(posArray.length)
 
-  if (case_value == "hard") applyCorrection()
+  // if (case_value == "hard")
+
+  if (case_value != "soft") applyCorrection()
 
   geometry.attributes.position.needsUpdate = true
   renderer.render(scene, camera)
