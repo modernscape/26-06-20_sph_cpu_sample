@@ -9,7 +9,7 @@ switch (case_value) {
     msg = "流体の非圧縮性"
     break
   case "02":
-    msg = "流体の非圧縮性"
+    msg = "02"
     break
   default:
     msg = "default"
