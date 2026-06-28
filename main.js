@@ -5,13 +5,10 @@ let msg = ""
 const params = new URLSearchParams(window.location.search)
 const case_value = params.get("case")
 switch (case_value) {
-<<<<<<< HEAD
   case "01":
     msg = "流体の非圧縮性"
-=======
   case "soft":
     msg = "流体の圧縮版"
->>>>>>> f4f7ca83317661b25f524239baeec24f5e588d77
     break
   case "02":
     msg = "02"
@@ -67,8 +64,6 @@ function addParticle() {
   velocities[count * 3 + 2] = 0
   // velocities = newVelocities
 
-
-
   // 2. densities 配列も拡張する！
   // const newDensities = new Float32Array(count + 1)
   // newDensities.set(densities)
@@ -106,12 +101,8 @@ function showCount() {
 }
 
 // 初期設定
-<<<<<<< HEAD
 const MAX_PARTICLES = 10000
 let count = 800
-=======
-let count = 1500
->>>>>>> f4f7ca83317661b25f524239baeec24f5e588d77
 const h = 0.6 // 影響範囲
 const restDensity = 2.0 // 理想密度
 const stiffness = 0.5 // 圧力係数
@@ -199,18 +190,13 @@ for (let i = 0; i < count; i++) {
 
 geometry.setAttribute("position", new THREE.BufferAttribute(posArray, 3))
 const material = new THREE.PointsMaterial({
-<<<<<<< HEAD
   size: 0.05,
   transparent: false,
   opacity: 1.0,
   vertexColors: true,
-=======
-  size: 0.03,
-  color: case_value == "soft" ? 0x0077ff : 0xff7700,
   // color: 0xff7700,
   transparent: true,
   opacity: 0.8,
->>>>>>> f4f7ca83317661b25f524239baeec24f5e588d77
 })
 
 const points = new THREE.Points(geometry, material)
@@ -254,11 +240,8 @@ function initParticles() {
 }
 
 initParticles()
-<<<<<<< HEAD
 
-=======
 showCount()
->>>>>>> f4f7ca83317661b25f524239baeec24f5e588d77
 function animate() {
   requestAnimationFrame(animate)
 
@@ -446,19 +429,14 @@ function animate() {
 
   // console.log(posArray.length)
 
-<<<<<<< HEAD
-  applyCorrection()
-
   // geometry.attributes.color.array.set(colors)
   // geometry.attributes.color.needsUpdate = true
 
   // geometry.attributes.color.array.set(colors)
   geometry.attributes.color.needsUpdate = true
-=======
   // if (case_value == "hard")
 
   if (case_value != "soft") applyCorrection()
->>>>>>> f4f7ca83317661b25f524239baeec24f5e588d77
 
   geometry.attributes.position.needsUpdate = true
   renderer.render(scene, camera)
