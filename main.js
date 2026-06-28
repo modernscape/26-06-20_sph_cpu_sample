@@ -23,21 +23,15 @@ document.getElementById("msgSpan").textContent = msg
 
 const addBtn = document.getElementById("addBtn")
 addBtn.addEventListener("click", () => {
-  const addCount = 3
+  const addCount = 1
   for (let i = 0; i < addCount; i++) {
     addParticle()
-    if (!addFlag) {
-      // addParticle()
-      addFlag = true
-    }
 
     console.log(count)
 
     // console.log(count)
   }
 })
-
-let addFlag = false
 
 function addParticle() {
   if (count >= MAX_PARTICLES) return
@@ -54,7 +48,6 @@ function addParticle() {
   // colors[count * 3 + 2] = 0.0
 
   console.log(count)
-  console.log(colors[count * 3 + 0])
 
   // posArray = newPosArray
 
@@ -98,7 +91,7 @@ function addParticle() {
 
 function showCount() {
   const c = document.getElementById("count")
-  c.textContent = count / 3
+  c.textContent = count
 }
 
 // 初期設定
@@ -196,7 +189,6 @@ const material = new THREE.PointsMaterial({
   opacity: 1.0,
   vertexColors: true,
   // color: 0xff7700,
-  transparent: true,
   opacity: 0.8,
 })
 
@@ -280,7 +272,7 @@ function animate() {
       colors = nextColors
     }
   }
-  diffuseColor()
+  // diffuseColor()
 
   // geometry.attributes.color.setXYZ(count, 1.0, 0.0, 0.0)
 
@@ -430,8 +422,7 @@ function animate() {
 
   // console.log(posArray.length)
 
-  // geometry.attributes.color.array.set(colors)
-  // geometry.attributes.color.needsUpdate = true
+  geometry.attributes.color.array.set(colors)
 
   // geometry.attributes.color.array.set(colors)
   geometry.attributes.color.needsUpdate = true
