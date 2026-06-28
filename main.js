@@ -26,52 +26,28 @@ addBtn.addEventListener("click", () => {
   const addCount = 1
   for (let i = 0; i < addCount; i++) {
     addParticle()
-
-    console.log(count)
-
-    // console.log(count)
   }
 })
 
 function addParticle() {
   if (count >= MAX_PARTICLES) return
 
-  // const newPosArray = new Float32Array(posArray.length + 3)
-  // newPosArray.set(posArray)
   const range = 0.2
   posArray[count * 3 + 0] = (Math.random() - range) * (range * 2)
   posArray[count * 3 + 1] = 2.0 // 少し高い位置から
   posArray[count * 3 + 2] = (Math.random() - range) * (range * 2)
 
-  // colors[count * 3 + 0] = 0.0 // R
-  // colors[count * 3 + 1] = 0.0
-  // colors[count * 3 + 2] = 0.0
-
-  console.log(count)
-
-  // posArray = newPosArray
-
-  // const newVelocities = new Float32Array(velocities.length + 3)
-  // newVelocities.set(velocities)
   velocities[count * 3 + 0] = 0
   velocities[count * 3 + 1] = -0.02 // 下向きの初速
   velocities[count * 3 + 2] = 0
-  // velocities = newVelocities
 
   // 2. densities 配列も拡張する！
-  // const newDensities = new Float32Array(count + 1)
-  // newDensities.set(densities)
   densities[count] = restDensity // 初期値を設定
-  // densities = newDensities
 
   // 色
-  // const newColors = new Float32Array(colors.length + 3)
-  // newColors.set(colors)
-
-  // colors = newColors
-
   geometry.attributes.color.setXYZ(count, 1.0, 0.0, 0.0)
-  // 2. 粒子数を更新
+
+  // 粒子数を更新
   count += 1
   showCount()
 
