@@ -6,10 +6,10 @@ const params = new URLSearchParams(window.location.search)
 const case_value = params.get("case")
 switch (case_value) {
   case "01":
-    msg = "流体の非圧縮性"
+    msg = "01"
     break
   case "soft":
-    msg = "流体の圧縮版"
+    msg = "非圧縮適用なし"
     break
   case "02":
     msg = "02"
@@ -96,7 +96,7 @@ function showCount() {
 
 // 初期設定
 const MAX_PARTICLES = 10000
-let count = 800
+let count = 1000
 const h = 0.6 // 影響範囲
 const restDensity = 2.0 // 理想密度
 const stiffness = 0.5 // 圧力係数
@@ -184,7 +184,7 @@ for (let i = 0; i < count; i++) {
 
 geometry.setAttribute("position", new THREE.BufferAttribute(posArray, 3))
 const material = new THREE.PointsMaterial({
-  size: 0.05,
+  size: 0.03,
   transparent: false,
   opacity: 1.0,
   vertexColors: true,
@@ -420,13 +420,8 @@ function animate() {
     }
   }
 
-  // console.log(posArray.length)
-
   geometry.attributes.color.array.set(colors)
-
-  // geometry.attributes.color.array.set(colors)
   geometry.attributes.color.needsUpdate = true
-  // if (case_value == "hard")
 
   if (case_value != "soft") applyCorrection()
 
@@ -434,5 +429,4 @@ function animate() {
   renderer.render(scene, camera)
   controls.update()
 }
-
 animate()
