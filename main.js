@@ -7,6 +7,7 @@ const case_value = params.get("case")
 switch (case_value) {
   case "01":
     msg = "流体の非圧縮性"
+    break
   case "soft":
     msg = "流体の圧縮版"
     break
