@@ -5,7 +5,7 @@ let msg = ""
 const params = new URLSearchParams(window.location.search)
 const case_value = params.get("case")
 switch (case_value) {
-  case "hard":
+  case "01":
     msg = "流体の非圧縮性"
     break
   case "02":
@@ -23,49 +23,78 @@ addBtn.addEventListener("click", () => {
   const addCount = 1
   for (let i = 0; i < addCount; i++) {
     addParticle()
+    if (!addFlag) {
+      // addParticle()
+      addFlag = true
+    }
+
+    console.log(count)
+
+    // console.log(count)
   }
 })
 
+let addFlag = false
+
 function addParticle() {
-  const newPosArray = new Float32Array(posArray.length + 3)
-  newPosArray.set(posArray)
+  if (count >= MAX_PARTICLES) return
+
+  // const newPosArray = new Float32Array(posArray.length + 3)
+  // newPosArray.set(posArray)
   const range = 0.2
-  newPosArray[posArray.length + 0] = (Math.random() - range) * (range * 2)
-  newPosArray[posArray.length + 1] = 2.0 // 少し高い位置から
-  newPosArray[posArray.length + 2] = (Math.random() - range) * (range * 2)
+  posArray[count * 3 + 0] = (Math.random() - range) * (range * 2)
+  posArray[count * 3 + 1] = 2.0 // 少し高い位置から
+  posArray[count * 3 + 2] = (Math.random() - range) * (range * 2)
 
-  posArray = newPosArray
+  // colors[count * 3 + 0] = 0.0 // R
+  // colors[count * 3 + 1] = 0.0
+  // colors[count * 3 + 2] = 0.0
 
-  const newVelocities = new Float32Array(velocities.length + 3)
-  newVelocities.set(velocities)
-  newVelocities[velocities.length + 0] = 0
-  newVelocities[velocities.length + 1] = -0.02 // 下向きの初速
-  newVelocities[velocities.length + 2] = 0
-  velocities = newVelocities
+  console.log(count)
+  console.log(colors[count * 3 + 0])
+
+  // posArray = newPosArray
+
+  // const newVelocities = new Float32Array(velocities.length + 3)
+  // newVelocities.set(velocities)
+  velocities[count * 3 + 0] = 0
+  velocities[count * 3 + 1] = -0.02 // 下向きの初速
+  velocities[count * 3 + 2] = 0
+  // velocities = newVelocities
 
   // 2. densities 配列も拡張する！
-  const newDensities = new Float32Array(count + 1)
-  newDensities.set(densities)
-  newDensities[count] = restDensity // 初期値を設定
-  densities = newDensities
+  // const newDensities = new Float32Array(count + 1)
+  // newDensities.set(densities)
+  densities[count] = restDensity // 初期値を設定
+  // densities = newDensities
 
+  // 色
+  // const newColors = new Float32Array(colors.length + 3)
+  // newColors.set(colors)
+
+  // colors = newColors
+
+  geometry.attributes.color.setXYZ(count, 1.0, 0.0, 0.0)
   // 2. 粒子数を更新
   count += 1
 
-  // 3. Three.js に「頂点数が増えたこと」を伝えてバッファを再生成
-  geometry.setAttribute("position", new THREE.BufferAttribute(posArray, 3))
+  geometry.attributes.color.count = count
+  geometry.attributes.position.count = count
 
-  // 必要であれば色などの属性も再セットしてください
-  // geometry.setAttribute("color", new THREE.BufferAttribute(newColors, 3))
+  // geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3))
+  // geometry.setAttribute("position", new THREE.BufferAttribute(posArray, 3))
 
   // 4. フラグを立てる
   geometry.attributes.position.needsUpdate = true
+  geometry.attributes.color.needsUpdate = true
 
-  console.log("現在数:", count)
+  geometry.attributes.color.needsUpdate = true
+  geometry.setDrawRange(0, count)
 }
 
 // 初期設定
-let count = 1200
+const MAX_PARTICLES = 10000
+let count = 800
 const h = 0.6 // 影響範囲
 const restDensity = 2.0 // 理想密度
 const stiffness = 0.5 // 圧力係数
@@ -138,26 +167,35 @@ window.addEventListener("DOMContentLoaded", () => {
 })
 // ジオメトリ
 const geometry = new THREE.BufferGeometry()
-let posArray = new Float32Array(count * 3)
+// let posArray = new Float32Array(count * 3)
+let posArray = new Float32Array(MAX_PARTICLES * 3)
+
 for (let i = 0; i < count; i++) {
   // 容器の範囲内に密集させて配置
   posArray[i * 3 + 0] = (Math.random() - 0.5) * 2.0 // -1 〜 1
   posArray[i * 3 + 1] = (Math.random() - 0.5) * 2.0
   posArray[i * 3 + 2] = (Math.random() - 0.5) * 2.0
 }
+// console.log(posArray[count * 3 - 1])
+// console.log(posArray[count * 3])
+// console.log(posArray[count * 3 + 1])
+// console.log(posArray[count * 3 + 2])
+
 geometry.setAttribute("position", new THREE.BufferAttribute(posArray, 3))
 const material = new THREE.PointsMaterial({
-  size: 0.03,
-  color: case_value == "hard" ? 0xff7700 : 0x0077ff,
-  transparent: true,
-  opacity: 0.8,
+  size: 0.05,
+  transparent: false,
+  opacity: 1.0,
+  vertexColors: true,
 })
 
 const points = new THREE.Points(geometry, material)
 scene.add(points)
 
-let velocities = new Float32Array(count * 3)
-let densities = new Float32Array(count)
+// let velocities = new Float32Array(count * 3)
+let velocities = new Float32Array(MAX_PARTICLES * 3)
+let densities = new Float32Array(MAX_PARTICLES)
+let colors = new Float32Array(MAX_PARTICLES * 3)
 
 // リセット用の定数
 const RESET_INTERVAL = 8000 // 5000ms = 5秒
@@ -165,30 +203,74 @@ let lastResetTime = Date.now()
 
 // 粒子を初期化する関数
 function initParticles() {
-  for (let i = 0; i < count; i++) {
-    // 位置をランダムに戻す
-    posArray[i * 3 + 0] = (Math.random() - 0.5) * 2.0
-    posArray[i * 3 + 1] = (Math.random() - 0.5) * 2.0
-    posArray[i * 3 + 2] = (Math.random() - 0.5) * 2.0
-
+  // for (let i = 0; i < MAX_PARTICLES; i++) {
+  for (let i = 0; i < MAX_PARTICLES; i++) {
     // 速度もリセット
     velocities[i * 3 + 0] = 0
     velocities[i * 3 + 1] = 0
     velocities[i * 3 + 2] = 0
+
+    // 色
+    colors[i * 3 + 0] = 15 / 255
+    colors[i * 3 + 1] = 227 / 255
+    colors[i * 3 + 2] = 255 / 255
+
+    // console.log(i)
+    // 0 - 9999
+
+    // count++
   }
-  geometry.attributes.position.needsUpdate = true
+  // count++
+
+  geometry.setDrawRange(0, count)
+  geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3))
+  // geometry.attributes.position.needsUpdate = true
+
   lastResetTime = Date.now()
 }
 
 initParticles()
+
 function animate() {
   requestAnimationFrame(animate)
-  // 一定時間経過でリセット
-  // if (Date.now() - lastResetTime > RESET_INTERVAL) {
-  //   initParticles()
-  // }
 
   const pos = geometry.attributes.position.array
+
+  function diffuseColor() {
+    // 色
+    let nextColors = new Float32Array(colors)
+
+    for (let i = 0; i < count; i++) {
+      let sumColor = colors[i]
+      let neighborCount = 1
+
+      for (let j = 0; j < count; j++) {
+        if (i === j) continue
+        const dx = pos[i * 3 + 0] - pos[j * 3 + 0]
+        const dy = pos[i * 3 + 1] - pos[j * 3 + 1]
+        const dz = pos[i * 3 + 2] - pos[j * 3 + 2]
+        const distSq = dx * dx + dy * dy + dz * dz
+        if (distSq < h * h) {
+          const dist = Math.sqrt(distSq)
+          const weight = Math.pow(1.0 - dist / h, 2)
+
+          sumColor += colors[j] * weight
+          neighborCount += weight
+        }
+        colors[i] = sumColor / neighborCount
+      }
+      geometry.attributes.color.setXYZ(
+        i,
+        colors[i * 3 + 0],
+        colors[i * 3 + 1],
+        colors[i * 3 + 2],
+      )
+      colors = nextColors
+    }
+  }
+  diffuseColor()
+
+  // geometry.attributes.color.setXYZ(count, 1.0, 0.0, 0.0)
 
   // 1. 密度計算
   for (let i = 0; i < count; i++) {
@@ -336,7 +418,13 @@ function animate() {
 
   // console.log(posArray.length)
 
-  if (case_value == "hard") applyCorrection()
+  applyCorrection()
+
+  // geometry.attributes.color.array.set(colors)
+  // geometry.attributes.color.needsUpdate = true
+
+  // geometry.attributes.color.array.set(colors)
+  geometry.attributes.color.needsUpdate = true
 
   geometry.attributes.position.needsUpdate = true
   renderer.render(scene, camera)
