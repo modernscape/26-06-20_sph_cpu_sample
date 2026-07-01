@@ -44,6 +44,10 @@ function addParticle() {
   // 2. densities 配列も拡張する！
   densities[count] = restDensity // 初期値を設定
 
+  colors[count * 3 + 0] = 1.0 // R
+  colors[count * 3 + 1] = 0.0 // G
+  colors[count * 3 + 2] = 0.0 // B
+
   // 色
   geometry.attributes.color.setXYZ(count, 1.0, 0.0, 0.0)
 
@@ -216,7 +220,61 @@ function animate() {
 
   const pos = geometry.attributes.position.array
 
+  let nextColors = new Float32Array(colors.length)
+
   function diffuseColor() {
+    const h = 5.0
+
+    for (let i = 0; i < count; i++) {
+      let rSum = 0,
+        gSum = 0,
+        bSum = 0
+      let weightSum = 0
+
+      for (let j = 0; j < count; j++) {
+        const dist = getDistance(i, j)
+
+        if (dist < h && dist > 0) {
+          const weight = 1 - dist / h
+          rSum += colors[j * 3 + 0] * weight
+          gSum += colors[j * 3 + 1] * weight
+          bSum += colors[j * 3 + 2] * weight
+
+          weightSum += weight
+        }
+      }
+
+      if (weightSum > 0) {
+        nextColors[i * 3 + 0] = rSum / weightSum
+        nextColors[i * 3 + 1] = gSum / weightSum
+        nextColors[i * 3 + 2] = bSum / weightSum
+      } else {
+        nextColors[i * 3 + 0] = colors[i * 3 + 0]
+        nextColors[i * 3 + 1] = colors[i * 3 + 1]
+        nextColors[i * 3 + 2] = colors[i * 3 + 2]
+      }
+    }
+    // colors = nextColors
+    colors.set(nextColors)
+  }
+
+  diffuseColor()
+
+  function getDistance(i, j) {
+    const dx = pos[j * 3 + 0] - pos[i * 3 + 0]
+    const dy = pos[j * 3 + 1] - pos[i * 3 + 1]
+    const dz = pos[j * 3 + 2] - pos[i * 3 + 2]
+    return Math.sqrt(dx * dx + dy * dy + dz * dz)
+  }
+
+  // 2. GPUへデータを転送する
+  const colorAttr = geometry.attributes.color
+
+  for (let i = 0; i < count; i++) {
+    colorAttr.setXYZ(i, colors[i * 3 + 0], colors[i * 3 + 1], colors[i * 3 + 2])
+  }
+
+  function diffuseColor_old() {
     // 色
     let nextColors = new Float32Array(colors)
 
