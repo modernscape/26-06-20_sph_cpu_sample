@@ -29,8 +29,13 @@ addBtn.addEventListener("click", () => {
   }
 })
 
+const MAX_PARTICLES = 10000
+let isRed = new Uint8Array(MAX_PARTICLES)
+
 function addParticle() {
   if (count >= MAX_PARTICLES) return
+
+  isRed[count] = 1
 
   const range = 0.2
   posArray[count * 3 + 0] = (Math.random() - range) * (range * 2)
@@ -41,25 +46,35 @@ function addParticle() {
   velocities[count * 3 + 1] = -0.02 // 下向きの初速
   velocities[count * 3 + 2] = 0
 
-  // 2. densities 配列も拡張する！
   densities[count] = restDensity // 初期値を設定
 
-  colors[count * 3 + 0] = 1.0 // R
-  colors[count * 3 + 1] = 0.0 // G
-  colors[count * 3 + 2] = 0.0 // B
+  colors[count * 3 + 0] = 1.0
+  colors[count * 3 + 1] = 0.0
+  colors[count * 3 + 2] = 0.0
 
-  // 色
   geometry.attributes.color.setXYZ(count, 1.0, 0.0, 0.0)
-
-  // 粒子数を更新
+  // 2. 粒子数を更新
   count += 1
   showCount()
 
+  // setTimeout(() => {
+  //   const isRed_new = new Uint8Array(MAX_PARTICLES)
+
+  //   isRed.set(isRed_new)
+  //   console.log("フラグオフ！")
+  //   console.log(count)
+
+  //   console.log(colors[count * 3 - 6])
+  //   console.log(colors[count * 3 - 5])
+  //   console.log(colors[count * 3 - 4])
+
+  //   console.log(colors[count * 3 - 3])
+  //   console.log(colors[count * 3 - 2])
+  //   console.log(colors[count * 3 - 1])
+  // }, 500)
+
   geometry.attributes.color.count = count
   geometry.attributes.position.count = count
-
-  // geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3))
-  // geometry.setAttribute("position", new THREE.BufferAttribute(posArray, 3))
 
   // 4. フラグを立てる
   geometry.attributes.position.needsUpdate = true
@@ -75,7 +90,7 @@ function showCount() {
 }
 
 // 初期設定
-const MAX_PARTICLES = 10000
+
 let count = 1000
 const h = 0.6 // 影響範囲
 const restDensity = 2.0 // 理想密度
@@ -127,6 +142,7 @@ function debouncedSaveCameraState() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
   }, 500)
 }
+
 // OrbitControls の変更イベントを監視
 controls.addEventListener("change", () => {
   debouncedSaveCameraState()
@@ -148,7 +164,6 @@ window.addEventListener("DOMContentLoaded", () => {
 })
 // ジオメトリ
 const geometry = new THREE.BufferGeometry()
-// let posArray = new Float32Array(count * 3)
 let posArray = new Float32Array(MAX_PARTICLES * 3)
 
 for (let i = 0; i < count; i++) {
@@ -157,10 +172,6 @@ for (let i = 0; i < count; i++) {
   posArray[i * 3 + 1] = (Math.random() - 0.5) * 2.0
   posArray[i * 3 + 2] = (Math.random() - 0.5) * 2.0
 }
-// console.log(posArray[count * 3 - 1])
-// console.log(posArray[count * 3])
-// console.log(posArray[count * 3 + 1])
-// console.log(posArray[count * 3 + 2])
 
 geometry.setAttribute("position", new THREE.BufferAttribute(posArray, 3))
 const material = new THREE.PointsMaterial({
@@ -175,7 +186,6 @@ const material = new THREE.PointsMaterial({
 const points = new THREE.Points(geometry, material)
 scene.add(points)
 
-// let velocities = new Float32Array(count * 3)
 let velocities = new Float32Array(MAX_PARTICLES * 3)
 let densities = new Float32Array(MAX_PARTICLES)
 let colors = new Float32Array(MAX_PARTICLES * 3)
@@ -186,7 +196,6 @@ let lastResetTime = Date.now()
 
 // 粒子を初期化する関数
 function initParticles() {
-  // for (let i = 0; i < MAX_PARTICLES; i++) {
   for (let i = 0; i < MAX_PARTICLES; i++) {
     // 速度もリセット
     velocities[i * 3 + 0] = 0
@@ -196,18 +205,11 @@ function initParticles() {
     // 色
     colors[i * 3 + 0] = 15 / 255
     colors[i * 3 + 1] = 227 / 255
-    colors[i * 3 + 2] = 255 / 255
-
-    // console.log(i)
-    // 0 - 9999
-
-    // count++
+    colors[i * 3 + 2] = 0.7
   }
-  // count++
 
   geometry.setDrawRange(0, count)
   geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3))
-  // geometry.attributes.position.needsUpdate = true
 
   lastResetTime = Date.now()
 }
@@ -215,6 +217,7 @@ function initParticles() {
 initParticles()
 
 showCount()
+
 function animate() {
   requestAnimationFrame(animate)
 
@@ -232,14 +235,22 @@ function animate() {
       let weightSum = 0
 
       for (let j = 0; j < count; j++) {
+        if (i === j) continue
+        if (isRed[i] || isRed[j]) {
+          // console.log("i")
+          // console.log(i)
+          // // console.log("j")
+          // console.log(j)
+          continue
+        }
+
         const dist = getDistance(i, j)
 
-        if (dist < h && dist > 0) {
+        if (dist > 0 && dist < h) {
           const weight = 1 - dist / h
           rSum += colors[j * 3 + 0] * weight
           gSum += colors[j * 3 + 1] * weight
           bSum += colors[j * 3 + 2] * weight
-
           weightSum += weight
         }
       }
@@ -254,11 +265,23 @@ function animate() {
         nextColors[i * 3 + 2] = colors[i * 3 + 2]
       }
     }
-    // colors = nextColors
     colors.set(nextColors)
+    // console.log(colors[count * 3 - 1])
+  }
+  diffuseColor()
+
+  const colorAttr = geometry.attributes.color
+
+  for (let i = 0; i < count; i++) {
+    colorAttr.setXYZ(
+      i,
+      colors[i * 3 + 0], //
+      colors[i * 3 + 1],
+      colors[i * 3 + 2],
+    )
   }
 
-  diffuseColor()
+  colorAttr.needsUpdate = true
 
   function getDistance(i, j) {
     const dx = pos[j * 3 + 0] - pos[i * 3 + 0]
@@ -266,49 +289,6 @@ function animate() {
     const dz = pos[j * 3 + 2] - pos[i * 3 + 2]
     return Math.sqrt(dx * dx + dy * dy + dz * dz)
   }
-
-  // 2. GPUへデータを転送する
-  const colorAttr = geometry.attributes.color
-
-  for (let i = 0; i < count; i++) {
-    colorAttr.setXYZ(i, colors[i * 3 + 0], colors[i * 3 + 1], colors[i * 3 + 2])
-  }
-
-  function diffuseColor_old() {
-    // 色
-    let nextColors = new Float32Array(colors)
-
-    for (let i = 0; i < count; i++) {
-      let sumColor = colors[i]
-      let neighborCount = 1
-
-      for (let j = 0; j < count; j++) {
-        if (i === j) continue
-        const dx = pos[i * 3 + 0] - pos[j * 3 + 0]
-        const dy = pos[i * 3 + 1] - pos[j * 3 + 1]
-        const dz = pos[i * 3 + 2] - pos[j * 3 + 2]
-        const distSq = dx * dx + dy * dy + dz * dz
-        if (distSq < h * h) {
-          const dist = Math.sqrt(distSq)
-          const weight = Math.pow(1.0 - dist / h, 2)
-
-          sumColor += colors[j] * weight
-          neighborCount += weight
-        }
-        colors[i] = sumColor / neighborCount
-      }
-      geometry.attributes.color.setXYZ(
-        i,
-        colors[i * 3 + 0],
-        colors[i * 3 + 1],
-        colors[i * 3 + 2],
-      )
-      colors = nextColors
-    }
-  }
-  // diffuseColor()
-
-  // geometry.attributes.color.setXYZ(count, 1.0, 0.0, 0.0)
 
   // 1. 密度計算
   for (let i = 0; i < count; i++) {
