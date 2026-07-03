@@ -22,7 +22,7 @@ switch (case_value) {
 document.getElementById("msgSpan").textContent = msg
 
 const MAX_PARTICLES = 5000
-let isRed = new Uint8Array(MAX_PARTICLES)
+// let isRed = new Uint8Array(MAX_PARTICLES)
 
 function showCount() {
   const c = document.getElementById("count")
@@ -179,7 +179,7 @@ function initParticles() {
   geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3))
   lastResetTime = Date.now()
 }
-initParticles()
+// initParticles()
 
 function activateParticles(n) {
   if (n >= MAX_PARTICLES) return
@@ -206,21 +206,55 @@ function activateParticles(n) {
     count += 1
   }
 }
-activateParticles(1000)
+// activateParticles(1000)
 
-geometry.attributes.color.count = count
-geometry.attributes.position.count = count
+// geometry.attributes.color.count = count
+// geometry.attributes.position.count = count
 
-// 4. フラグを立てる
-geometry.attributes.position.needsUpdate = true
-geometry.attributes.color.needsUpdate = true
+// geometry.attributes.position.needsUpdate = true
+// geometry.attributes.color.needsUpdate = true
 
-geometry.attributes.color.needsUpdate = true
-geometry.setDrawRange(0, count)
+// geometry.attributes.color.needsUpdate = true
+// geometry.setDrawRange(0, count)
 
 showCount()
 
-function addParticle() {
+async function init() {
+  initParticles()
+
+  await addParticleSeqentially(500, 15 / 255, 227 / 255, 255 / 255)
+  console.log("step2")
+
+  await addParticleSeqentially(500, 255 / 255, 100 / 255, 100 / 255)
+  addBtn.disabled = false
+}
+
+// function accumulateParticles(num, r, g, b) {
+//   const timer = setInterval(() => {
+//     addParticle(r, g, b)
+//     if (count > num) {
+//       addBtn.disabled = false
+//       clearInterval(timer)
+//     }
+//   }, 0.05)
+// }
+
+function addParticleSeqentially(num, r, g, b, intervalMs = 0.05) {
+  return new Promise((resolve) => {
+    let added = 0
+    const timer = setInterval(() => {
+      addParticle(r, g, b)
+      added++
+      if (added >= num) {
+        clearInterval(timer)
+        // count += added
+        resolve()
+      }
+    }, intervalMs)
+  })
+}
+
+function addParticle(r, g, b) {
   if (count >= MAX_PARTICLES) return
 
   const range = 0.2
@@ -229,19 +263,19 @@ function addParticle() {
   posArray[count * 3 + 2] = (Math.random() - range) * (range * 2)
 
   velocities[count * 3 + 0] = 0
-  velocities[count * 3 + 1] = -0.02 // 下向きの初速
+  velocities[count * 3 + 1] = -0.04 // 下向きの初速
   velocities[count * 3 + 2] = 0
 
   densities[count] = restDensity // 初期値を設定
 
-  colors[count * 3 + 0] = 1.0
-  colors[count * 3 + 1] = 0.0
-  colors[count * 3 + 2] = 0.0
+  colors[count * 3 + 0] = r //15 / 255
+  colors[count * 3 + 1] = g //227 / 255
+  colors[count * 3 + 2] = b //255 / 255
 
-  geometry.attributes.color.setXYZ(count, 1.0, 0.0, 0.0)
+  geometry.attributes.color.setXYZ(count, r, g, b)
   // 2. 粒子数を更新
-  count += 1
   showCount()
+  count += 1
 
   geometry.attributes.color.count = count
   geometry.attributes.position.count = count
@@ -255,14 +289,18 @@ function addParticle() {
 }
 
 const addBtn = document.getElementById("addBtn")
+addBtn.disabled = true
 addBtn.addEventListener("click", () => {
-  const addCount = 10
-  for (let i = 0; i < addCount; i++) {
-    addParticle()
-  }
+  addParticleSeqentially(100, 1, 0, 0)
+  // const addCount = 100
+  // for (let i = 0; i < addCount; i++) {
+  //   addParticle(1.0, 0.0, 0.0)
+  // }
 })
 
-showCount()
+init()
+
+// showCount()
 
 function animate() {
   requestAnimationFrame(animate)
@@ -282,13 +320,13 @@ function animate() {
 
       for (let j = 0; j < count; j++) {
         if (i === j) continue
-        if (isRed[i] || isRed[j]) {
-          // console.log("i")
-          // console.log(i)
-          // // console.log("j")
-          // console.log(j)
-          continue
-        }
+        // if (isRed[i] || isRed[j]) {
+        //   // console.log("i")
+        //   // console.log(i)
+        //   // // console.log("j")
+        //   // console.log(j)
+        //   continue
+        // }
 
         const dist = getDistance(i, j)
 
@@ -382,6 +420,9 @@ function animate() {
     }
   }
 
+  const floor_y = 1.5
+  const wall_x = 1.5
+  const wall_z = 1.5
   // 3. 物理更新と境界判定
   for (let i = 0; i < count; i++) {
     velocities[i * 3 + 1] += gravity
@@ -390,16 +431,16 @@ function animate() {
     pos[i * 3 + 2] += velocities[i * 3 + 2]
 
     // 境界判定 (床と壁)
-    if (pos[i * 3 + 1] < -2.0) {
-      pos[i * 3 + 1] = -2.0
+    if (pos[i * 3 + 1] < -floor_y) {
+      pos[i * 3 + 1] = -floor_y
       velocities[i * 3 + 1] *= -0.5
     }
-    if (Math.abs(pos[i * 3]) > 2.0) {
-      pos[i * 3] = Math.sign(pos[i * 3]) * 2.0
+    if (Math.abs(pos[i * 3]) > wall_x) {
+      pos[i * 3] = Math.sign(pos[i * 3]) * wall_z
       velocities[i * 3] *= -0.5
     }
-    if (Math.abs(pos[i * 3 + 2]) > 2.0) {
-      pos[i * 3 + 2] = Math.sign(pos[i * 3 + 2]) * 2.0
+    if (Math.abs(pos[i * 3 + 2]) > wall_z) {
+      pos[i * 3 + 2] = Math.sign(pos[i * 3 + 2]) * wall_z
       velocities[i * 3 + 2] *= -0.5
     }
 
