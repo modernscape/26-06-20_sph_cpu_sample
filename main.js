@@ -238,7 +238,7 @@ async function init() {
 //   }, 0.05)
 // }
 
-function addParticleSeqentially(num, r, g, b, intervalMs = 0.05) {
+function addParticleSeqentially(num, r, g, b, intervalMs = 0.2) {
   return new Promise((resolve) => {
     let added = 0
     const timer = setInterval(() => {
