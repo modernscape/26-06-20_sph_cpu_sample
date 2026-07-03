@@ -222,10 +222,9 @@ showCount()
 async function init() {
   initParticles()
 
-  await addParticleSeqentially(500, 15 / 255, 227 / 255, 255 / 255)
-  console.log("step2")
-
-  await addParticleSeqentially(500, 255 / 255, 100 / 255, 100 / 255)
+  await addParticleSeqentially(300, 255 / 255, 10 / 255, 10 / 255)
+  await addParticleSeqentially(300, 10 / 255, 255 / 255, 10 / 255)
+  await addParticleSeqentially(300, 10 / 255, 255 / 255, 255 / 255)
   addBtn.disabled = false
 }
 
@@ -292,10 +291,6 @@ const addBtn = document.getElementById("addBtn")
 addBtn.disabled = true
 addBtn.addEventListener("click", () => {
   addParticleSeqentially(100, 1, 0, 0)
-  // const addCount = 100
-  // for (let i = 0; i < addCount; i++) {
-  //   addParticle(1.0, 0.0, 0.0)
-  // }
 })
 
 init()
