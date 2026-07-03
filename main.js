@@ -21,68 +21,8 @@ switch (case_value) {
 
 document.getElementById("msgSpan").textContent = msg
 
-const addBtn = document.getElementById("addBtn")
-addBtn.addEventListener("click", () => {
-  const addCount = 1
-  for (let i = 0; i < addCount; i++) {
-    addParticle()
-  }
-})
-
-const MAX_PARTICLES = 10000
+const MAX_PARTICLES = 5000
 let isRed = new Uint8Array(MAX_PARTICLES)
-
-function addParticle() {
-  if (count >= MAX_PARTICLES) return
-
-  isRed[count] = 1
-
-  const range = 0.2
-  posArray[count * 3 + 0] = (Math.random() - range) * (range * 2)
-  posArray[count * 3 + 1] = 2.0 // 少し高い位置から
-  posArray[count * 3 + 2] = (Math.random() - range) * (range * 2)
-
-  velocities[count * 3 + 0] = 0
-  velocities[count * 3 + 1] = -0.02 // 下向きの初速
-  velocities[count * 3 + 2] = 0
-
-  densities[count] = restDensity // 初期値を設定
-
-  colors[count * 3 + 0] = 1.0
-  colors[count * 3 + 1] = 0.0
-  colors[count * 3 + 2] = 0.0
-
-  geometry.attributes.color.setXYZ(count, 1.0, 0.0, 0.0)
-  // 2. 粒子数を更新
-  count += 1
-  showCount()
-
-  // setTimeout(() => {
-  //   const isRed_new = new Uint8Array(MAX_PARTICLES)
-
-  //   isRed.set(isRed_new)
-  //   console.log("フラグオフ！")
-  //   console.log(count)
-
-  //   console.log(colors[count * 3 - 6])
-  //   console.log(colors[count * 3 - 5])
-  //   console.log(colors[count * 3 - 4])
-
-  //   console.log(colors[count * 3 - 3])
-  //   console.log(colors[count * 3 - 2])
-  //   console.log(colors[count * 3 - 1])
-  // }, 500)
-
-  geometry.attributes.color.count = count
-  geometry.attributes.position.count = count
-
-  // 4. フラグを立てる
-  geometry.attributes.position.needsUpdate = true
-  geometry.attributes.color.needsUpdate = true
-
-  geometry.attributes.color.needsUpdate = true
-  geometry.setDrawRange(0, count)
-}
 
 function showCount() {
   const c = document.getElementById("count")
@@ -91,7 +31,7 @@ function showCount() {
 
 // 初期設定
 
-let count = 1000
+let count = 0
 const h = 0.6 // 影響範囲
 const restDensity = 2.0 // 理想密度
 const stiffness = 0.5 // 圧力係数
@@ -103,14 +43,19 @@ const scene = new THREE.Scene()
 const camera = new THREE.PerspectiveCamera(
   75,
   window.innerWidth / window.innerHeight,
-  0.1,
+  0.001,
   1000,
 )
 camera.position.set(0, 0, 5)
+camera.updateProjectionMatrix() // これを忘れないようにしてください
 const renderer = new THREE.WebGLRenderer()
 renderer.setSize(window.innerWidth, window.innerHeight)
 document.body.appendChild(renderer.domElement)
 const controls = new OrbitControls(camera, renderer.domElement)
+controls.minDistance = 0
+controls.maxDistance = 10000
+controls.minPolarAngle = 0
+controls.maxPolarAngle = Math.PI
 // controls.enablePan = false
 
 const STORAGE_KEY = "camera-state-data"
@@ -184,6 +129,9 @@ const material = new THREE.PointsMaterial({
 })
 
 const points = new THREE.Points(geometry, material)
+// points.frustumCulled = false
+points.geometry.computeBoundingSphere()
+points.geometry.boundingSphere.radius += 10 // 半径を広げて誤判定を防ぐ
 scene.add(points)
 
 let velocities = new Float32Array(MAX_PARTICLES * 3)
@@ -195,6 +143,25 @@ const RESET_INTERVAL = 8000 // 5000ms = 5秒
 let lastResetTime = Date.now()
 
 // 粒子を初期化する関数
+// function initParticles_old() {
+//   for (let i = 0; i < MAX_PARTICLES; i++) {
+//     // 速度もリセット
+//     velocities[i * 3 + 0] = 0
+//     velocities[i * 3 + 1] = 0
+//     velocities[i * 3 + 2] = 0
+
+//     // 色
+//     colors[i * 3 + 0] = 15 / 255
+//     colors[i * 3 + 1] = 227 / 255
+//     colors[i * 3 + 2] = 0.7
+//   }
+
+//   geometry.setDrawRange(0, count)
+//   geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3))
+
+//   lastResetTime = Date.now()
+// }
+
 function initParticles() {
   for (let i = 0; i < MAX_PARTICLES; i++) {
     // 速度もリセット
@@ -203,18 +170,97 @@ function initParticles() {
     velocities[i * 3 + 2] = 0
 
     // 色
-    colors[i * 3 + 0] = 15 / 255
-    colors[i * 3 + 1] = 227 / 255
-    colors[i * 3 + 2] = 0.7
+    colors[i * 3 + 0] = 0.0
+    colors[i * 3 + 1] = 0.0
+    colors[i * 3 + 2] = 0.0
   }
 
-  geometry.setDrawRange(0, count)
+  // geometry.setDrawRange(0, count)
   geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3))
-
   lastResetTime = Date.now()
 }
-
 initParticles()
+
+function activateParticles(n) {
+  if (n >= MAX_PARTICLES) return
+
+  for (let i = 0; i < n; i++) {
+    const range = 0.2
+    posArray[i * 3 + 0] = (Math.random() - range) * (range * 2)
+    posArray[i * 3 + 1] = 2.0 // 少し高い位置から
+    posArray[i * 3 + 2] = (Math.random() - range) * (range * 2)
+
+    velocities[i * 3 + 0] = 0
+    velocities[i * 3 + 1] = -0.02 // 下向きの初速
+    velocities[i * 3 + 2] = 0
+
+    densities[i] = restDensity // 初期値を設定
+
+    // 水色にする
+    colors[i * 3 + 0] = 15 / 255
+    colors[i * 3 + 1] = 227 / 255
+    colors[i * 3 + 2] = 255 / 255
+
+    geometry.attributes.color.setXYZ(i, 15 / 255, 227 / 255, 255 / 255)
+    // 2. 粒子数を更新
+    count += 1
+  }
+}
+activateParticles(1000)
+
+geometry.attributes.color.count = count
+geometry.attributes.position.count = count
+
+// 4. フラグを立てる
+geometry.attributes.position.needsUpdate = true
+geometry.attributes.color.needsUpdate = true
+
+geometry.attributes.color.needsUpdate = true
+geometry.setDrawRange(0, count)
+
+showCount()
+
+function addParticle() {
+  if (count >= MAX_PARTICLES) return
+
+  const range = 0.2
+  posArray[count * 3 + 0] = (Math.random() - range) * (range * 2)
+  posArray[count * 3 + 1] = 2.0 // 少し高い位置から
+  posArray[count * 3 + 2] = (Math.random() - range) * (range * 2)
+
+  velocities[count * 3 + 0] = 0
+  velocities[count * 3 + 1] = -0.02 // 下向きの初速
+  velocities[count * 3 + 2] = 0
+
+  densities[count] = restDensity // 初期値を設定
+
+  colors[count * 3 + 0] = 1.0
+  colors[count * 3 + 1] = 0.0
+  colors[count * 3 + 2] = 0.0
+
+  geometry.attributes.color.setXYZ(count, 1.0, 0.0, 0.0)
+  // 2. 粒子数を更新
+  count += 1
+  showCount()
+
+  geometry.attributes.color.count = count
+  geometry.attributes.position.count = count
+
+  // 4. フラグを立てる
+  geometry.attributes.position.needsUpdate = true
+  geometry.attributes.color.needsUpdate = true
+
+  geometry.attributes.color.needsUpdate = true
+  geometry.setDrawRange(0, count)
+}
+
+const addBtn = document.getElementById("addBtn")
+addBtn.addEventListener("click", () => {
+  const addCount = 10
+  for (let i = 0; i < addCount; i++) {
+    addParticle()
+  }
+})
 
 showCount()
 
@@ -226,7 +272,7 @@ function animate() {
   let nextColors = new Float32Array(colors.length)
 
   function diffuseColor() {
-    const h = 5.0
+    const h = 0.5
 
     for (let i = 0; i < count; i++) {
       let rSum = 0,
