@@ -1,36 +1,10 @@
 import * as THREE from "three"
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js"
 
-let msg = ""
-const params = new URLSearchParams(window.location.search)
-const case_value = params.get("case")
-switch (case_value) {
-  case "01":
-    msg = "01"
-    break
-  case "soft":
-    msg = "非圧縮適用なし"
-    break
-  case "02":
-    msg = "02"
-    break
-  default:
-    // msg = "default"
-    break
-}
-
-document.getElementById("msgSpan").textContent = msg
-
+/******************************************************
+ * 定数
+ *****************************************************/
 const MAX_PARTICLES = 5000
-// let isRed = new Uint8Array(MAX_PARTICLES)
-
-function showCount() {
-  const c = document.getElementById("count")
-  c.textContent = count
-}
-
-// 初期設定
-
 let count = 0
 const h = 0.6 // 影響範囲
 const restDensity = 2.0 // 理想密度
@@ -38,7 +12,10 @@ const stiffness = 0.5 // 圧力係数
 const viscosity = 0.15 // 粘度係数
 const gravity = -0.005
 
-// シーン・カメラ・レンダラー等は既存のまま使用
+/******************************************************
+ * シーン、カメラ、レンダラー
+ *****************************************************/
+
 const scene = new THREE.Scene()
 const camera = new THREE.PerspectiveCamera(
   75,
@@ -56,14 +33,14 @@ controls.minDistance = 0
 controls.maxDistance = 10000
 controls.minPolarAngle = 0
 controls.maxPolarAngle = Math.PI
-// controls.enablePan = false
 
+/******************************************************
+ * カメラの状態を保存
+ *****************************************************/
 const STORAGE_KEY = "camera-state-data"
 let saveTimer = null // タイマー管理用
 
-/**
- * 視点を保存する関数（デバウンス用）
- */
+// 視点を保存する関数（デバウンス用）
 function debouncedSaveCameraState() {
   // 既存のタイマーがあればキャンセル
   if (saveTimer) {
@@ -93,7 +70,7 @@ controls.addEventListener("change", () => {
   debouncedSaveCameraState()
 })
 
-// --- 初期化時に復元（前回と同じ） ---
+// 初期化時に復元（前回と同じ）
 window.addEventListener("DOMContentLoaded", () => {
   const savedState = localStorage.getItem(STORAGE_KEY)
   if (savedState) {
@@ -107,118 +84,63 @@ window.addEventListener("DOMContentLoaded", () => {
     }
   }
 })
-// ジオメトリ
+
+/******************************************************
+ * UI
+ *****************************************************/
+function showCount() {
+  const c = document.getElementById("count")
+  c.textContent = count
+}
+
+// パラメータによってメッセージを設定
+let msg = ""
+const params = new URLSearchParams(window.location.search)
+const case_value = params.get("case")
+switch (case_value) {
+  case "soft":
+    msg = "非圧縮適用なし"
+    break
+  default:
+    msg = ""
+    break
+}
+document.getElementById("msgSpan").textContent = msg
+
+// ボタンをクリックしたら粒子を追加
+const addBtn = document.getElementById("addBtn")
+addBtn.disabled = true
+addBtn.addEventListener("click", () => {
+  addParticleSeqentially(50, 1, 0, 0)
+})
+
+/******************************************************
+ * points オブジェクト
+ *****************************************************/
 const geometry = new THREE.BufferGeometry()
 let posArray = new Float32Array(MAX_PARTICLES * 3)
-
-for (let i = 0; i < count; i++) {
-  // 容器の範囲内に密集させて配置
-  posArray[i * 3 + 0] = (Math.random() - 0.5) * 2.0 // -1 〜 1
-  posArray[i * 3 + 1] = (Math.random() - 0.5) * 2.0
-  posArray[i * 3 + 2] = (Math.random() - 0.5) * 2.0
-}
 
 geometry.setAttribute("position", new THREE.BufferAttribute(posArray, 3))
 const material = new THREE.PointsMaterial({
   size: 0.03,
   transparent: false,
-  opacity: 1.0,
   vertexColors: true,
-  // color: 0xff7700,
   opacity: 0.8,
 })
 
 const points = new THREE.Points(geometry, material)
-// points.frustumCulled = false
 points.geometry.computeBoundingSphere()
 points.geometry.boundingSphere.radius += 10 // 半径を広げて誤判定を防ぐ
 scene.add(points)
 
+/******************************************************
+ * 流体実装
+ *****************************************************/
 let velocities = new Float32Array(MAX_PARTICLES * 3)
 let densities = new Float32Array(MAX_PARTICLES)
 let colors = new Float32Array(MAX_PARTICLES * 3)
 
-// リセット用の定数
-const RESET_INTERVAL = 8000 // 5000ms = 5秒
-let lastResetTime = Date.now()
-
-// 粒子を初期化する関数
-// function initParticles_old() {
-//   for (let i = 0; i < MAX_PARTICLES; i++) {
-//     // 速度もリセット
-//     velocities[i * 3 + 0] = 0
-//     velocities[i * 3 + 1] = 0
-//     velocities[i * 3 + 2] = 0
-
-//     // 色
-//     colors[i * 3 + 0] = 15 / 255
-//     colors[i * 3 + 1] = 227 / 255
-//     colors[i * 3 + 2] = 0.7
-//   }
-
-//   geometry.setDrawRange(0, count)
-//   geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3))
-
-//   lastResetTime = Date.now()
-// }
-
-function initParticles() {
-  for (let i = 0; i < MAX_PARTICLES; i++) {
-    // 速度もリセット
-    velocities[i * 3 + 0] = 0
-    velocities[i * 3 + 1] = 0
-    velocities[i * 3 + 2] = 0
-
-    // 色
-    colors[i * 3 + 0] = 0.0
-    colors[i * 3 + 1] = 0.0
-    colors[i * 3 + 2] = 0.0
-  }
-
-  // geometry.setDrawRange(0, count)
-  geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3))
-  lastResetTime = Date.now()
-}
-// initParticles()
-
-function activateParticles(n) {
-  if (n >= MAX_PARTICLES) return
-
-  for (let i = 0; i < n; i++) {
-    const range = 0.2
-    posArray[i * 3 + 0] = (Math.random() - range) * (range * 2)
-    posArray[i * 3 + 1] = 2.0 // 少し高い位置から
-    posArray[i * 3 + 2] = (Math.random() - range) * (range * 2)
-
-    velocities[i * 3 + 0] = 0
-    velocities[i * 3 + 1] = -0.02 // 下向きの初速
-    velocities[i * 3 + 2] = 0
-
-    densities[i] = restDensity // 初期値を設定
-
-    // 水色にする
-    colors[i * 3 + 0] = 15 / 255
-    colors[i * 3 + 1] = 227 / 255
-    colors[i * 3 + 2] = 255 / 255
-
-    geometry.attributes.color.setXYZ(i, 15 / 255, 227 / 255, 255 / 255)
-    // 2. 粒子数を更新
-    count += 1
-  }
-}
-// activateParticles(1000)
-
-// geometry.attributes.color.count = count
-// geometry.attributes.position.count = count
-
-// geometry.attributes.position.needsUpdate = true
-// geometry.attributes.color.needsUpdate = true
-
-// geometry.attributes.color.needsUpdate = true
-// geometry.setDrawRange(0, count)
-
-showCount()
-
+// 初期化
 async function init() {
   initParticles()
 
@@ -228,16 +150,24 @@ async function init() {
   addBtn.disabled = false
 }
 
-// function accumulateParticles(num, r, g, b) {
-//   const timer = setInterval(() => {
-//     addParticle(r, g, b)
-//     if (count > num) {
-//       addBtn.disabled = false
-//       clearInterval(timer)
-//     }
-//   }, 0.05)
-// }
+// 粒子を初期化
+function initParticles() {
+  for (let i = 0; i < MAX_PARTICLES; i++) {
+    // 速度を初期化
+    velocities[i * 3 + 0] = 0
+    velocities[i * 3 + 1] = 0
+    velocities[i * 3 + 2] = 0
 
+    // 色を初期化
+    colors[i * 3 + 0] = 0.0
+    colors[i * 3 + 1] = 0.0
+    colors[i * 3 + 2] = 0.0
+  }
+
+  geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3))
+}
+
+// 粒子を順番に追加
 function addParticleSeqentially(num, r, g, b, intervalMs = 10) {
   return new Promise((resolve) => {
     let added = 0
@@ -253,6 +183,7 @@ function addParticleSeqentially(num, r, g, b, intervalMs = 10) {
   })
 }
 
+// 粒子を追加
 function addParticle(r, g, b) {
   if (count >= MAX_PARTICLES) return
 
@@ -272,14 +203,15 @@ function addParticle(r, g, b) {
   colors[count * 3 + 2] = b //255 / 255
 
   geometry.attributes.color.setXYZ(count, r, g, b)
-  // 2. 粒子数を更新
+
   showCount()
+
   count += 1
 
   geometry.attributes.color.count = count
   geometry.attributes.position.count = count
 
-  // 4. フラグを立てる
+  // フラグを立てる
   geometry.attributes.position.needsUpdate = true
   geometry.attributes.color.needsUpdate = true
 
@@ -287,15 +219,7 @@ function addParticle(r, g, b) {
   geometry.setDrawRange(0, count)
 }
 
-const addBtn = document.getElementById("addBtn")
-addBtn.disabled = true
-addBtn.addEventListener("click", () => {
-  addParticleSeqentially(100, 1, 0, 0)
-})
-
 init()
-
-// showCount()
 
 function animate() {
   requestAnimationFrame(animate)
@@ -315,13 +239,6 @@ function animate() {
 
       for (let j = 0; j < count; j++) {
         if (i === j) continue
-        // if (isRed[i] || isRed[j]) {
-        //   // console.log("i")
-        //   // console.log(i)
-        //   // // console.log("j")
-        //   // console.log(j)
-        //   continue
-        // }
 
         const dist = getDistance(i, j)
 
@@ -345,7 +262,6 @@ function animate() {
       }
     }
     colors.set(nextColors)
-    // console.log(colors[count * 3 - 1])
   }
   diffuseColor()
 
