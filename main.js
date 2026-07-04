@@ -234,11 +234,25 @@ function getDistance(i, j) {
 
 // 近傍探索
 function getNeighbors(i) {
+  let neighbors = []
+  for (let j = 0; j < count; j++) {
+    if (i === j) continue
+    const dist = getDistance(i, j)
+    if (0 < dist && dist < h) {
+      const weight = calculateWeight(dist, h)
+    }
+  }
+
   return []
 }
 
+function calculateWeight(dist, h) {
+  if (dist > 0) return 0
+  return 1 - dist / h
+}
+
 // 加重平均
-function getWeightAverage(targetPropertyArray, i, neighbors, propetySize) {
+function getWeightedAverage(targetPropertyArray, i, neighbors, propetySize) {
   let sum = 0
   let weightSum = 0
   for (const n of neighbors) {
@@ -258,77 +272,54 @@ function getWeightAverage(targetPropertyArray, i, neighbors, propetySize) {
 // 圧力
 // 粘度
 
-function updateDensityAndPressure(i, neighbors) {} // 密度
-function applyViscosityAndCorrection(i, neighbors) {} // 粘度
-function applyColorDiffusion(i, neighbors) {} // 色
+// 密度
+function updateDensityAndPressure(i, neighbors) {}
+
+// 粘度
+function applyViscosityAndCorrection(i, neighbors) {}
+
+// 色
+function applyColorDiffusion(i, neighbors) {}
 
 /******************************************************
- * 粒子の更新 （メインループ）
+ * カーネル関数 OLD
  *****************************************************/
-function updateParticles() {
-  // 統合ループ
+// 色計算
+let nextColors = new Float32Array(colors.length)
+function diffuseColor() {
+  const h = 0.5
+
   for (let i = 0; i < count; i++) {
-    const neighbors = getNeighbors(i)
+    let rSum = 0,
+      gSum = 0,
+      bSum = 0
+    let weightSum = 0
 
-    // 1. 密度と圧力を計算して「密度状態」を確定
-    updateDensityAndPressure(i, neighbors)
+    for (let j = 0; j < count; j++) {
+      if (i === j) continue
 
-    // 2. 確定した圧力をもとに「速度」を加重平均（粘性と圧力補正）
-    applyViscosityAndCorrection(i, neighbors)
+      const dist = getDistance(i, j)
 
-    // 3. 速度と圧力を経て「色」を加重平均
-    applyColorDiffusion(i, neighbors)
-  }
-}
-
-/******************************************************
- * フレーム更新
- *****************************************************/
-function animate() {
-  requestAnimationFrame(animate)
-
-  const pos = geometry.attributes.position.array
-
-  // updateParticles(pos)
-
-  let nextColors = new Float32Array(colors.length)
-
-  function diffuseColor() {
-    const h = 0.5
-
-    for (let i = 0; i < count; i++) {
-      let rSum = 0,
-        gSum = 0,
-        bSum = 0
-      let weightSum = 0
-
-      for (let j = 0; j < count; j++) {
-        if (i === j) continue
-
-        const dist = getDistance(i, j)
-
-        if (dist > 0 && dist < h) {
-          const weight = 1 - dist / h
-          rSum += colors[j * 3 + 0] * weight
-          gSum += colors[j * 3 + 1] * weight
-          bSum += colors[j * 3 + 2] * weight
-          weightSum += weight
-        }
-      }
-
-      if (weightSum > 0) {
-        nextColors[i * 3 + 0] = rSum / weightSum
-        nextColors[i * 3 + 1] = gSum / weightSum
-        nextColors[i * 3 + 2] = bSum / weightSum
-      } else {
-        nextColors[i * 3 + 0] = colors[i * 3 + 0]
-        nextColors[i * 3 + 1] = colors[i * 3 + 1]
-        nextColors[i * 3 + 2] = colors[i * 3 + 2]
+      if (dist > 0 && dist < h) {
+        const weight = 1 - dist / h
+        rSum += colors[j * 3 + 0] * weight
+        gSum += colors[j * 3 + 1] * weight
+        bSum += colors[j * 3 + 2] * weight
+        weightSum += weight
       }
     }
-    colors.set(nextColors)
+
+    if (weightSum > 0) {
+      nextColors[i * 3 + 0] = rSum / weightSum
+      nextColors[i * 3 + 1] = gSum / weightSum
+      nextColors[i * 3 + 2] = bSum / weightSum
+    } else {
+      nextColors[i * 3 + 0] = colors[i * 3 + 0]
+      nextColors[i * 3 + 1] = colors[i * 3 + 1]
+      nextColors[i * 3 + 2] = colors[i * 3 + 2]
+    }
   }
-  diffuseColor()
+  colors.set(nextColors)
 
   const colorAttr = geometry.attributes.color
 
@@ -340,10 +331,11 @@ function animate() {
       colors[i * 3 + 2],
     )
   }
-
   colorAttr.needsUpdate = true
+}
 
-  // 1. 密度計算
+// 密度計算
+function calcDensities() {
   for (let i = 0; i < count; i++) {
     let d = 0
     for (let j = 0; j < count; j++) {
@@ -358,8 +350,10 @@ function animate() {
     }
     densities[i] = Math.max(d, 0.0001)
   }
+}
 
-  // 2. 圧力・粘性計算
+// 圧力・粘性計算
+function calcPressure() {
   for (let i = 0; i < count; i++) {
     for (let j = 0; j < count; j++) {
       if (i === j) continue
@@ -388,11 +382,14 @@ function animate() {
       }
     }
   }
+}
 
+// 物理更新と境界判定
+function calcPhysics() {
   const floor_y = 1.5
   const wall_x = 1.5
   const wall_z = 1.5
-  // 3. 物理更新と境界判定
+
   for (let i = 0; i < count; i++) {
     velocities[i * 3 + 1] += gravity
     pos[i * 3] += velocities[i * 3]
@@ -418,85 +415,136 @@ function animate() {
     velocities[i * 3 + 1] *= 0.99
     velocities[i * 3 + 2] *= 0.99
   }
+}
 
-  function computeDensity() {
-    const pos = geometry.attributes.position.array
-    const h2 = h * h // 影響範囲の二乗（計算効率のため）
+// 非圧縮性
+// イテレーション回数（最初は2〜3で十分です）
+const MAX_ITERATIONS = 2
 
+function computeDensity() {
+  const pos = geometry.attributes.position.array
+  const h2 = h * h // 影響範囲の二乗（計算効率のため）
+
+  for (let i = 0; i < count; i++) {
+    let d = 0
+
+    // 自分の位置を取得
+    const xi = pos[i * 3 + 0]
+    const yi = pos[i * 3 + 1]
+    const zi = pos[i * 3 + 2]
+
+    for (let j = 0; j < count; j++) {
+      // 自分自身は含めない（あるいは含めるカーネルもあるが、基本は除外）
+      if (i === j) continue
+
+      const dx = xi - pos[j * 3 + 0]
+      const dy = yi - pos[j * 3 + 1]
+      const dz = zi - pos[j * 3 + 2]
+      const distSq = dx * dx + dy * dy + dz * dz
+
+      // 影響範囲内であれば計算
+      if (distSq < h2) {
+        const dist = Math.sqrt(distSq)
+        // 二乗カーネル (1 - r/h)^2
+        const w = 1.0 - dist / h
+        d += w * w
+      }
+    }
+    // 密度が0にならないよう微小値を加算
+    densities[i] = Math.max(d, 0.0001)
+  }
+}
+function applyCorrection() {
+  // 密度が restDensity になるまで反復する
+  for (let iter = 0; iter < MAX_ITERATIONS; iter++) {
+    computeDensity() // 1. 最新の密度を計算
+
+    // 圧力による力を適用
     for (let i = 0; i < count; i++) {
-      let d = 0
-
-      // 自分の位置を取得
-      const xi = pos[i * 3 + 0]
-      const yi = pos[i * 3 + 1]
-      const zi = pos[i * 3 + 2]
-
       for (let j = 0; j < count; j++) {
-        // 自分自身は含めない（あるいは含めるカーネルもあるが、基本は除外）
         if (i === j) continue
 
-        const dx = xi - pos[j * 3 + 0]
-        const dy = yi - pos[j * 3 + 1]
-        const dz = zi - pos[j * 3 + 2]
+        const dx = pos[i * 3] - pos[j * 3],
+          dy = pos[i * 3 + 1] - pos[j * 3 + 1],
+          dz = pos[i * 3 + 2] - pos[j * 3 + 2]
         const distSq = dx * dx + dy * dy + dz * dz
 
-        // 影響範囲内であれば計算
-        if (distSq < h2) {
+        if (distSq < h * h && distSq > 0.0001) {
           const dist = Math.sqrt(distSq)
-          // 二乗カーネル (1 - r/h)^2
           const w = 1.0 - dist / h
-          d += w * w
-        }
-      }
-      // 密度が0にならないよう微小値を加算
-      densities[i] = Math.max(d, 0.0001)
-    }
-  }
 
-  // イテレーション回数（最初は2〜3で十分です）
-  const MAX_ITERATIONS = 2
+          // 圧力の差分を計算（密度のエラー分だけ強く反発させる）
+          const densityError = densities[i] - restDensity
+          const pressure = stiffness * densityError
 
-  function applyCorrection() {
-    // 密度が restDensity になるまで反復する
-    for (let iter = 0; iter < MAX_ITERATIONS; iter++) {
-      computeDensity() // 1. 最新の密度を計算
-
-      // 2. 圧力による力を適用
-      for (let i = 0; i < count; i++) {
-        for (let j = 0; j < count; j++) {
-          if (i === j) continue
-
-          const dx = pos[i * 3] - pos[j * 3],
-            dy = pos[i * 3 + 1] - pos[j * 3 + 1],
-            dz = pos[i * 3 + 2] - pos[j * 3 + 2]
-          const distSq = dx * dx + dy * dy + dz * dz
-
-          if (distSq < h * h && distSq > 0.0001) {
-            const dist = Math.sqrt(distSq)
-            const w = 1.0 - dist / h
-
-            // 圧力の差分を計算（密度のエラー分だけ強く反発させる）
-            const densityError = densities[i] - restDensity
-            const pressure = stiffness * densityError
-
-            // 力を適用（密度が高いほど強く弾く）
-            const force = (pressure * w * w) / densities[i]
-            velocities[i * 3] += (dx / dist) * force * 0.05
-            velocities[i * 3 + 1] += (dy / dist) * force * 0.05
-            velocities[i * 3 + 2] += (dz / dist) * force * 0.05
-          }
+          // 力を適用（密度が高いほど強く弾く）
+          const force = (pressure * w * w) / densities[i]
+          velocities[i * 3] += (dx / dist) * force * 0.05
+          velocities[i * 3 + 1] += (dy / dist) * force * 0.05
+          velocities[i * 3 + 2] += (dz / dist) * force * 0.05
         }
       }
     }
   }
+}
 
-  geometry.attributes.color.array.set(colors)
-  geometry.attributes.color.needsUpdate = true
+/******************************************************
+ * 粒子の更新 （メインループ） OLD
+ *****************************************************/
+function updateParticles_cur() {
+  // 色計算
+  diffuseColor()
 
+  // 密度計算
+  calcDensities()
+
+  // 圧力・粘性計算
+  calcPressure()
+
+  // 物理更新と境界判定
+  calcPhysics()
+
+  // 非圧縮性
   applyCorrection()
+}
+
+/******************************************************
+ * 粒子の更新 （メインループ）
+ *****************************************************/
+function updateParticles() {
+  // 統合ループ
+  for (let i = 0; i < count; i++) {
+    const neighbors = getNeighbors(i)
+
+    // 1. 密度と圧力を計算して「密度状態」を確定
+    updateDensityAndPressure(i, neighbors)
+
+    // 2. 確定した圧力をもとに「速度」を加重平均（粘性と圧力補正）
+    applyViscosityAndCorrection(i, neighbors)
+
+    // 3. 速度と圧力を経て「色」を加重平均
+    applyColorDiffusion(i, neighbors)
+  }
+}
+
+/******************************************************
+ * フレーム更新
+ *****************************************************/
+const pos = geometry.attributes.position.array
+
+function animate() {
+  requestAnimationFrame(animate)
+
+  updateParticles_cur()
+  // updateParticles()
+
+  // geometry.attributes.color.array.set(colors)
+
+  controls.update()
 
   geometry.attributes.position.needsUpdate = true
+  geometry.attributes.color.needsUpdate = true
+
   renderer.render(scene, camera)
-  controls.update()
 }
 animate()
