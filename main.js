@@ -1,6 +1,5 @@
 import * as THREE from "three"
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js"
-import { traa } from "three/examples/jsm/tsl/display/TRAANode.js"
 
 /******************************************************
  * UI
@@ -242,7 +241,6 @@ function getNeighbors(i) {
       const weight = calculateWeight(dist, h)
     }
   }
-
   return []
 }
 
@@ -272,17 +270,8 @@ function getWeightedAverage(targetPropertyArray, i, neighbors, propetySize) {
 // 圧力
 // 粘度
 
-// 密度
-function updateDensityAndPressure(i, neighbors) {}
-
-// 粘度
-function applyViscosityAndCorrection(i, neighbors) {}
-
-// 色
-function applyColorDiffusion(i, neighbors) {}
-
 /******************************************************
- * カーネル関数 OLD
+ * CUR
  *****************************************************/
 // 色計算
 let nextColors = new Float32Array(colors.length)
@@ -416,7 +405,6 @@ function calcPhysics() {
     velocities[i * 3 + 2] *= 0.99
   }
 }
-
 // 非圧縮性
 // イテレーション回数（最初は2〜3で十分です）
 const MAX_ITERATIONS = 2
@@ -488,9 +476,6 @@ function applyCorrection() {
   }
 }
 
-/******************************************************
- * 粒子の更新 （メインループ） OLD
- *****************************************************/
 function updateParticles_cur() {
   // 色計算
   diffuseColor()
@@ -509,46 +494,63 @@ function updateParticles_cur() {
 }
 
 /******************************************************
- * 粒子の更新 （メインループ）
+ * 物理計算用バッファの定義
  *****************************************************/
-function updateParticles_0() {
-  // 統合ループ
-  for (let i = 0; i < count; i++) {
-    const neighbors = getNeighbors(i)
+// 位置・速度・加速度（各粒子 x, y, z の3次元分確保）
+// 3次元座標を計算しやすいよう、X, Y, Zそれぞれの配列で管理するのがコツです
+const posX = new Float32Array(MAX_PARTICLES)
+const posY = new Float32Array(MAX_PARTICLES)
+const posZ = new Float32Array(MAX_PARTICLES)
 
-    // 1. 密度と圧力を計算して「密度状態」を確定
-    updateDensityAndPressure(i, neighbors)
+const velX = new Float32Array(MAX_PARTICLES)
+const velY = new Float32Array(MAX_PARTICLES)
+const velZ = new Float32Array(MAX_PARTICLES)
 
-    // 2. 確定した圧力をもとに「速度」を加重平均（粘性と圧力補正）
-    applyViscosityAndCorrection(i, neighbors)
+const accX = new Float32Array(MAX_PARTICLES)
+const accY = new Float32Array(MAX_PARTICLES)
+const accZ = new Float32Array(MAX_PARTICLES)
 
-    // 3. 速度と圧力を経て「色」を加重平均
-    applyColorDiffusion(i, neighbors)
-  }
-}
-
+// 物理状態用のバッファ
 const densityBuffer = new Float32Array(MAX_PARTICLES)
 const pressureBuffer = new Float32Array(MAX_PARTICLES)
-const velBufferX = new Float32Array(MAX_PARTICLES)
 
+// 質量用（初期値はすべて 1.0 に埋めておくと密度計算が楽です）
+const massBuffer = new Float32Array(MAX_PARTICLES).fill(1.0)
+
+/******************************************************
+ * 粒子の更新 （メインループ）
+ *****************************************************/
+// 統合されたメイン更新関数
 function updateParticles() {
-  // 統合ループ
+  // すべての計算で共通の「近傍リスト」を生成
+  // ※毎回生成すると重いので、実際は最適化が必要ですが、まずはこれで整理
+  const allNeighbors = []
   for (let i = 0; i < count; i++) {
-    const neighbors = getNeighbors(i)
+    allNeighbors[i] = getNeighbors(i)
+  }
 
-    // 1. 密度の更新
-    // 密度は「質量（今回は1とする）」の重み付き合計で求まる
-    // 汎用化のため、densityBuffer という配列を用意しておくと便利です
-    densityBuffer[i] = getWeightedAverage(dummyMassArray, i, neighbors)
-
-    // 2. 圧力の更新（密度から計算）
-    // 圧力は密度を使って計算する物理式なので、ここは少しカスタマイズが必要
+  // 1. 密度と圧力の更新（状態決定）
+  for (let i = 0; i < count; i++) {
+    densityBuffer[i] = getWeightedAverage(dummyMassArray, i, allNeighbors[i])
     pressureBuffer[i] = calculatePressureFromDensity(densityBuffer[i])
+  }
 
-    // 3. 速度の拡散（粘性）
-    // 速度配列(velBufferX, velBufferY)を周囲と混ぜる
-    velBufferX[i] = getWeightedAverage(velBufferX, i, neighbors)
-    velBufferY[i] = getWeightedAverage(velBufferY, i, neighbors)
+  // 2. 力の計算（圧力勾配・粘性）
+  for (let i = 0; i < count; i++) {
+    // 汎用エンジンを使って、力をベクトルとして算出
+    const force = calculateTotalForce(i, allNeighbors[i])
+    velocities[i] += force * dt
+  }
+
+  // 3. 物理更新（積分・境界判定）
+  for (let i = 0; i < count; i++) {
+    pos[i] += velocities[i] * dt
+    applyBoundary(i)
+  }
+
+  // 4. その他（色拡散など）
+  for (let i = 0; i < count; i++) {
+    applyColorDiffusion(i, allNeighbors[i])
   }
 }
 
@@ -561,9 +563,6 @@ function animate() {
   requestAnimationFrame(animate)
 
   updateParticles_cur()
-  // updateParticles()
-
-  // geometry.attributes.color.array.set(colors)
 
   controls.update()
 
