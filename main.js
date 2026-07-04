@@ -511,7 +511,7 @@ function updateParticles_cur() {
 /******************************************************
  * 粒子の更新 （メインループ）
  *****************************************************/
-function updateParticles() {
+function updateParticles_0() {
   // 統合ループ
   for (let i = 0; i < count; i++) {
     const neighbors = getNeighbors(i)
@@ -524,6 +524,31 @@ function updateParticles() {
 
     // 3. 速度と圧力を経て「色」を加重平均
     applyColorDiffusion(i, neighbors)
+  }
+}
+
+const densityBuffer = new Float32Array(MAX_PARTICLES)
+const pressureBuffer = new Float32Array(MAX_PARTICLES)
+const velBufferX = new Float32Array(MAX_PARTICLES)
+
+function updateParticles() {
+  // 統合ループ
+  for (let i = 0; i < count; i++) {
+    const neighbors = getNeighbors(i)
+
+    // 1. 密度の更新
+    // 密度は「質量（今回は1とする）」の重み付き合計で求まる
+    // 汎用化のため、densityBuffer という配列を用意しておくと便利です
+    densityBuffer[i] = getWeightedAverage(dummyMassArray, i, neighbors)
+
+    // 2. 圧力の更新（密度から計算）
+    // 圧力は密度を使って計算する物理式なので、ここは少しカスタマイズが必要
+    pressureBuffer[i] = calculatePressureFromDensity(densityBuffer[i])
+
+    // 3. 速度の拡散（粘性）
+    // 速度配列(velBufferX, velBufferY)を周囲と混ぜる
+    velBufferX[i] = getWeightedAverage(velBufferX, i, neighbors)
+    velBufferY[i] = getWeightedAverage(velBufferY, i, neighbors)
   }
 }
 
