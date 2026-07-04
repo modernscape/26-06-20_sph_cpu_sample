@@ -1,5 +1,35 @@
 import * as THREE from "three"
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js"
+import { traa } from "three/examples/jsm/tsl/display/TRAANode.js"
+
+/******************************************************
+ * UI
+ *****************************************************/
+function showCount() {
+  const c = document.getElementById("count")
+  c.textContent = count
+}
+
+// パラメータによってメッセージを設定
+let msg = ""
+const params = new URLSearchParams(window.location.search)
+const case_value = params.get("case")
+switch (case_value) {
+  case "parameter":
+    msg = "メッセージ"
+    break
+  default:
+    msg = ""
+    break
+}
+document.getElementById("msgSpan").textContent = msg
+
+// ボタンをクリックしたら粒子を追加
+const addBtn = document.getElementById("addBtn")
+addBtn.disabled = true
+addBtn.addEventListener("click", () => {
+  addParticleSeqentially(50, 1, 0, 0)
+})
 
 /******************************************************
  * 定数
@@ -80,38 +110,9 @@ window.addEventListener("DOMContentLoaded", () => {
       controls.target.set(state.target.x, state.target.y, state.target.z)
       controls.update()
     } catch (e) {
-      // console.error("復元データが不正です:", e)
+      console.error("復元データが不正です:", e)
     }
   }
-})
-
-/******************************************************
- * UI
- *****************************************************/
-function showCount() {
-  const c = document.getElementById("count")
-  c.textContent = count
-}
-
-// パラメータによってメッセージを設定
-let msg = ""
-const params = new URLSearchParams(window.location.search)
-const case_value = params.get("case")
-switch (case_value) {
-  case "soft":
-    msg = "非圧縮適用なし"
-    break
-  default:
-    msg = ""
-    break
-}
-document.getElementById("msgSpan").textContent = msg
-
-// ボタンをクリックしたら粒子を追加
-const addBtn = document.getElementById("addBtn")
-addBtn.disabled = true
-addBtn.addEventListener("click", () => {
-  addParticleSeqentially(50, 1, 0, 0)
 })
 
 /******************************************************
@@ -134,7 +135,7 @@ points.geometry.boundingSphere.radius += 10 // 半径を広げて誤判定を防
 scene.add(points)
 
 /******************************************************
- * 流体実装
+ * 粒子を作成、追加
  *****************************************************/
 let velocities = new Float32Array(MAX_PARTICLES * 3)
 let densities = new Float32Array(MAX_PARTICLES)
@@ -163,7 +164,6 @@ function initParticles() {
     colors[i * 3 + 1] = 0.0
     colors[i * 3 + 2] = 0.0
   }
-
   geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3))
 }
 
@@ -221,10 +221,75 @@ function addParticle(r, g, b) {
 
 init()
 
+/******************************************************
+ * 汎用関数
+ *****************************************************/
+// 距離
+function getDistance(i, j) {
+  const dx = pos[j * 3 + 0] - pos[i * 3 + 0]
+  const dy = pos[j * 3 + 1] - pos[i * 3 + 1]
+  const dz = pos[j * 3 + 2] - pos[i * 3 + 2]
+  return Math.sqrt(dx * dx + dy * dy + dz * dz)
+}
+
+// 近傍探索
+function getNeighbors(i) {
+  return []
+}
+
+// 加重平均
+function getWeightAverage(targetPropertyArray, i, neighbors, propetySize) {
+  let sum = 0
+  let weightSum = 0
+  for (const n of neighbors) {
+    sum += targetPropertyArray[n.index] * n.weight
+    weightSum += n.weight
+  }
+  return weightSum > 0 ? sum / weightSum : targetPropertyArray[i]
+}
+
+/******************************************************
+ * カーネル関数
+ *****************************************************/
+// 速度
+// 位置
+// 色
+// 密度
+// 圧力
+// 粘度
+
+function updateDensityAndPressure(i, neighbors) {} // 密度
+function applyViscosityAndCorrection(i, neighbors) {} // 粘度
+function applyColorDiffusion(i, neighbors) {} // 色
+
+/******************************************************
+ * 粒子の更新 （メインループ）
+ *****************************************************/
+function updateParticles() {
+  // 統合ループ
+  for (let i = 0; i < count; i++) {
+    const neighbors = getNeighbors(i)
+
+    // 1. 密度と圧力を計算して「密度状態」を確定
+    updateDensityAndPressure(i, neighbors)
+
+    // 2. 確定した圧力をもとに「速度」を加重平均（粘性と圧力補正）
+    applyViscosityAndCorrection(i, neighbors)
+
+    // 3. 速度と圧力を経て「色」を加重平均
+    applyColorDiffusion(i, neighbors)
+  }
+}
+
+/******************************************************
+ * フレーム更新
+ *****************************************************/
 function animate() {
   requestAnimationFrame(animate)
 
   const pos = geometry.attributes.position.array
+
+  // updateParticles(pos)
 
   let nextColors = new Float32Array(colors.length)
 
@@ -277,13 +342,6 @@ function animate() {
   }
 
   colorAttr.needsUpdate = true
-
-  function getDistance(i, j) {
-    const dx = pos[j * 3 + 0] - pos[i * 3 + 0]
-    const dy = pos[j * 3 + 1] - pos[i * 3 + 1]
-    const dz = pos[j * 3 + 2] - pos[i * 3 + 2]
-    return Math.sqrt(dx * dx + dy * dy + dz * dz)
-  }
 
   // 1. 密度計算
   for (let i = 0; i < count; i++) {
@@ -435,7 +493,7 @@ function animate() {
   geometry.attributes.color.array.set(colors)
   geometry.attributes.color.needsUpdate = true
 
-  if (case_value != "soft") applyCorrection()
+  applyCorrection()
 
   geometry.attributes.position.needsUpdate = true
   renderer.render(scene, camera)
