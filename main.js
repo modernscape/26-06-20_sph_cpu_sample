@@ -221,46 +221,6 @@ function addParticle(r, g, b) {
 init()
 
 /******************************************************
- * 汎用関数
- *****************************************************/
-// 距離
-function getDistance(i, j) {
-  const dx = pos[j * 3 + 0] - pos[i * 3 + 0]
-  const dy = pos[j * 3 + 1] - pos[i * 3 + 1]
-  const dz = pos[j * 3 + 2] - pos[i * 3 + 2]
-  return Math.sqrt(dx * dx + dy * dy + dz * dz)
-}
-
-// 近傍探索
-function getNeighbors(i) {
-  let neighbors = []
-  for (let j = 0; j < count; j++) {
-    if (i === j) continue
-    const dist = getDistance(i, j)
-    if (0 < dist && dist < h) {
-      const weight = calculateWeight(dist, h)
-    }
-  }
-  return []
-}
-
-function calculateWeight(dist, h) {
-  if (dist > 0) return 0
-  return 1 - dist / h
-}
-
-// 加重平均
-function getWeightedAverage(targetPropertyArray, i, neighbors, propetySize) {
-  let sum = 0
-  let weightSum = 0
-  for (const n of neighbors) {
-    sum += targetPropertyArray[n.index] * n.weight
-    weightSum += n.weight
-  }
-  return weightSum > 0 ? sum / weightSum : targetPropertyArray[i]
-}
-
-/******************************************************
  * カーネル関数
  *****************************************************/
 // 速度
@@ -442,6 +402,7 @@ function computeDensity() {
     densities[i] = Math.max(d, 0.0001)
   }
 }
+
 function applyCorrection() {
   // 密度が restDensity になるまで反復する
   for (let iter = 0; iter < MAX_ITERATIONS; iter++) {
@@ -510,6 +471,11 @@ const accX = new Float32Array(MAX_PARTICLES)
 const accY = new Float32Array(MAX_PARTICLES)
 const accZ = new Float32Array(MAX_PARTICLES)
 
+// 各粒子の色情報を管理するバッファ
+const colorR = new Float32Array(MAX_PARTICLES)
+const colorG = new Float32Array(MAX_PARTICLES)
+const colorB = new Float32Array(MAX_PARTICLES)
+
 // 物理状態用のバッファ
 const densityBuffer = new Float32Array(MAX_PARTICLES)
 const pressureBuffer = new Float32Array(MAX_PARTICLES)
@@ -521,7 +487,7 @@ const massBuffer = new Float32Array(MAX_PARTICLES).fill(1.0)
  * 粒子の更新 （メインループ）
  *****************************************************/
 // 統合されたメイン更新関数
-function updateParticles() {
+function updateParticles(dt) {
   // すべての計算で共通の「近傍リスト」を生成
   // ※毎回生成すると重いので、実際は最適化が必要ですが、まずはこれで整理
   const allNeighbors = []
@@ -531,7 +497,7 @@ function updateParticles() {
 
   // 1. 密度と圧力の更新（状態決定）
   for (let i = 0; i < count; i++) {
-    densityBuffer[i] = getWeightedAverage(dummyMassArray, i, allNeighbors[i])
+    densityBuffer[i] = getWeightedAverage(massBuffer, i, allNeighbors[i])
     pressureBuffer[i] = calculatePressureFromDensity(densityBuffer[i])
   }
 
@@ -555,16 +521,165 @@ function updateParticles() {
 }
 
 /******************************************************
+ * 属性計算
+ *****************************************************/
+// 1. 密度と圧力の更新（状態決定）
+/**
+ * 密度から圧力を算出する
+ * @param {number} density - 現在の密度
+ * @returns {number} - 算出された圧力
+ */
+function calculatePressureFromDensity(density) {
+  // 1. 理想密度との差分を求める
+  const densityError = density - restDensity
+
+  // 2. 差分に係数（stiffness）を掛けて圧力にする
+  // 密度が理想より高ければプラス（押し出す力）、低ければマイナス（吸い寄せる力）になります
+  let pressure = stiffness * densityError
+
+  // 3. 負の圧力（吸い込み）は液体ではあまり起こらないため、0以上にする（任意）
+  // 完全に「水」のように振る舞わせたい場合は、ここを Math.max(0, pressure) にします
+  return pressure
+}
+
+// 2. 力の計算（圧力勾配・粘性）
+function calculateTotalForce(i, neighbors) {
+  let forceX = 0
+  let forceY = 0
+  let forceZ = 0
+
+  for (const n of neighbors) {
+    const j = n.index
+
+    // 1. 方向ベクトル (自分 i から 相手 j へのベクトル)
+    const dx = posX[i] - posX[j]
+    const dy = posY[i] - posY[j]
+    const dz = posZ[i] - posZ[j]
+    const dist = Math.sqrt(dx * dx + dy * dy + dz * dz)
+
+    if (dist > 0 && dist < h) {
+      // 2. 圧力による力 (圧力勾配)
+      // 双方の圧力の平均が高いほど、強く押し返す
+      const p_i = pressureBuffer[i]
+      const p_j = pressureBuffer[j]
+      const forceMag = (p_i + p_j) / 2.0 // 圧力の平均
+
+      // 3. 力をベクトルに加算 (正規化した方向に力をかける)
+      const w = 1.0 - dist / h // 距離が近いほど強く影響する重み
+      forceX += (dx / dist) * forceMag * w
+      forceY += (dy / dist) * forceMag * w
+      forceZ += (dz / dist) * forceMag * w
+    }
+  }
+  return { x: forceX, y: forceY, z: forceZ }
+}
+
+function applyBoundary(i) {
+  const floorY = -1.5
+  const wallX = 1.5
+  const wallZ = 1.5
+  const restitution = 0.5 // 反発係数（1.0で完全弾性衝突、0で全く跳ね返らない）
+
+  // 床（Y軸の下限）
+  if (posY[i] < floorY) {
+    posY[i] = floorY
+    velY[i] *= -restitution // 速度を反転させて跳ね返す
+  }
+
+  // 壁（X軸）
+  if (Math.abs(posX[i]) > wallX) {
+    posX[i] = Math.sign(posX[i]) * wallX
+    velX[i] *= -restitution
+  }
+
+  // 壁（Z軸）
+  if (Math.abs(posZ[i]) > wallZ) {
+    posZ[i] = Math.sign(posZ[i]) * wallZ
+    velZ[i] *= -restitution
+  }
+}
+
+function applyColorDiffusion(i, neighbors) {
+  const diffusionRate = 0.05 // 混ざり合う強さ（0.0〜1.0）
+
+  // 周囲の粒子の色の平均を計算する
+  const avgR = getWeightedAverage(colorR, i, neighbors)
+  const avgG = getWeightedAverage(colorG, i, neighbors)
+  const avgB = getWeightedAverage(colorB, i, neighbors)
+
+  // 自分の色を、周囲の平均値へ少しだけ近づける
+  colorR[i] += (avgR - colorR[i]) * diffusionRate
+  colorG[i] += (avgG - colorG[i]) * diffusionRate
+  colorB[i] += (avgB - colorB[i]) * diffusionRate
+}
+
+/******************************************************
+ * 汎用関数
+ *****************************************************/
+// 距離
+function getDistance(i, j) {
+  const dx = pos[j * 3 + 0] - pos[i * 3 + 0]
+  const dy = pos[j * 3 + 1] - pos[i * 3 + 1]
+  const dz = pos[j * 3 + 2] - pos[i * 3 + 2]
+  return Math.sqrt(dx * dx + dy * dy + dz * dz)
+}
+
+// 近傍探索
+function getNeighbors(i) {
+  let neighbors = []
+  for (let j = 0; j < count; j++) {
+    if (i === j) continue
+    const dist = getDistance(i, j)
+    if (0 < dist && dist < h) {
+      const weight = calculateWeight(dist, h)
+      neighbors.push({
+        index: j, //
+        weight: weight,
+      })
+    }
+  }
+  return neighbors
+}
+
+function calculateWeight(dist, h) {
+  if (dist >= h) return 0
+  return 1 - dist / h
+}
+
+// 加重平均
+function getWeightedAverage(targetPropertyArray, i, neighbors, propetySize) {
+  let sum = 0
+  let weightSum = 0
+  for (const n of neighbors) {
+    sum += targetPropertyArray[n.index] * n.weight
+    weightSum += n.weight
+  }
+  return weightSum > 0 ? sum / weightSum : targetPropertyArray[i]
+}
+
+/******************************************************
  * フレーム更新
  *****************************************************/
 const pos = geometry.attributes.position.array
 
+const clock = new THREE.Clock()
+
 function animate() {
   requestAnimationFrame(animate)
 
+  const dt = Math.min(clock.getDelta(), 0.033) // 最大でも 0.033秒(約30fps相当)までに制限
+
   updateParticles_cur()
+  // updateParticles(dt)
 
   controls.update()
+
+  for (let i = 0; i < count; i++) {
+    // 位置の反映
+    geometry.attributes.position.setXYZ(i, posX[i], posY[i], posZ[i])
+    // 色を three.js のジオメトリにセット
+    geometry.attributes.color.setXYZ(i, colorR[i], colorG[i], colorB[i])
+  }
 
   geometry.attributes.position.needsUpdate = true
   geometry.attributes.color.needsUpdate = true
