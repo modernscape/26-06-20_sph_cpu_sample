@@ -36,15 +36,47 @@ addBtn.addEventListener("click", () => {
 const MAX_PARTICLES = 5000
 let count = 0
 const h = 0.6 // 影響範囲
-const restDensity = 2.0 // 理想密度
-const stiffness = 0.5 // 圧力係数
-const viscosity = 0.15 // 粘度係数
-const gravity = -0.005
+const restDensity = 3.0 // 理想密度
+const stiffness = 10 //0.5 // 圧力係数
+// const viscosity = 0.15 // 粘度係数
+// const gravity = -0.005
+
+/******************************************************
+ * 物理計算用バッファの定義
+ *****************************************************/
+// 位置・速度・加速度（各粒子 x, y, z の3次元分確保）
+// 3次元座標を計算しやすいよう、X, Y, Zそれぞれの配列で管理するのがコツです
+const posX = new Float32Array(MAX_PARTICLES)
+const posY = new Float32Array(MAX_PARTICLES)
+const posZ = new Float32Array(MAX_PARTICLES)
+
+const velX = new Float32Array(MAX_PARTICLES)
+const velY = new Float32Array(MAX_PARTICLES)
+const velZ = new Float32Array(MAX_PARTICLES)
+
+const accX = new Float32Array(MAX_PARTICLES)
+const accY = new Float32Array(MAX_PARTICLES)
+const accZ = new Float32Array(MAX_PARTICLES)
+
+// 各粒子の色情報を管理するバッファ
+const colorR = new Float32Array(MAX_PARTICLES)
+const colorG = new Float32Array(MAX_PARTICLES)
+const colorB = new Float32Array(MAX_PARTICLES)
+
+// 物理状態用のバッファ
+const densityBuffer = new Float32Array(MAX_PARTICLES)
+const pressureBuffer = new Float32Array(MAX_PARTICLES)
+
+// 質量用（初期値はすべて 1.0 に埋めておくと密度計算が楽です）
+const massBuffer = new Float32Array(MAX_PARTICLES).fill(1.0)
+
+// let velocities = new Float32Array(MAX_PARTICLES * 3)
+let densities = new Float32Array(MAX_PARTICLES)
+// let colors = new Float32Array(MAX_PARTICLES * 3)
 
 /******************************************************
  * シーン、カメラ、レンダラー
  *****************************************************/
-
 const scene = new THREE.Scene()
 const camera = new THREE.PerspectiveCamera(
   75,
@@ -136,9 +168,6 @@ scene.add(points)
 /******************************************************
  * 粒子を作成、追加
  *****************************************************/
-let velocities = new Float32Array(MAX_PARTICLES * 3)
-let densities = new Float32Array(MAX_PARTICLES)
-let colors = new Float32Array(MAX_PARTICLES * 3)
 
 // 初期化
 async function init() {
@@ -152,18 +181,41 @@ async function init() {
 
 // 粒子を初期化
 function initParticles() {
-  for (let i = 0; i < MAX_PARTICLES; i++) {
-    // 速度を初期化
-    velocities[i * 3 + 0] = 0
-    velocities[i * 3 + 1] = 0
-    velocities[i * 3 + 2] = 0
+  // --- ここを追加 ---
+  // 粒子の色情報を保持するための空の配列を用意し、ジオメトリに登録する
+  const colorAttribute = new THREE.BufferAttribute(
+    new Float32Array(MAX_PARTICLES * 3),
+    3,
+  )
+  geometry.setAttribute("color", colorAttribute)
 
-    // 色を初期化
-    colors[i * 3 + 0] = 0.0
-    colors[i * 3 + 1] = 0.0
-    colors[i * 3 + 2] = 0.0
+  // 位置情報も同様に登録されているか確認
+  const posAttribute = new THREE.BufferAttribute(
+    new Float32Array(MAX_PARTICLES * 3),
+    3,
+  )
+  geometry.setAttribute("position", posAttribute)
+  // -------------------
+
+  for (let i = 0; i < MAX_PARTICLES; i++) {
+    // 速度の初期化
+    velX[i] = 0
+    velY[i] = 0
+    velZ[i] = 0
+
+    // 色の初期化
+    colorR[i] = 0.0
+    colorG[i] = 0.0
+    colorB[i] = 0.0
   }
-  geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3))
+
+  //  2. Three.jsのジオメトリにセットする際は「DynamicDrawUsage」を使うと高速
+  const colorBuffer = new THREE.BufferAttribute(
+    new Float32Array(MAX_PARTICLES * 3),
+    3,
+  )
+  colorBuffer.setUsage(THREE.DynamicDrawUsage)
+  geometry.setAttribute("color", colorBuffer)
 }
 
 // 粒子を順番に追加
@@ -186,38 +238,46 @@ function addParticleSeqentially(num, r, g, b, intervalMs = 10) {
 function addParticle(r, g, b) {
   if (count >= MAX_PARTICLES) return
 
-  const range = 0.2
-  posArray[count * 3 + 0] = (Math.random() - range) * (range * 2)
-  posArray[count * 3 + 1] = 2.0 // 少し高い位置から
-  posArray[count * 3 + 2] = (Math.random() - range) * (range * 2)
+  const range = 1.0
 
-  velocities[count * 3 + 0] = 0
-  velocities[count * 3 + 1] = -0.04 // 下向きの初速
-  velocities[count * 3 + 2] = 0
+  // 位置の初期化
+  posX[count] = (Math.random() - 0.5) * (range * 2)
+  posY[count] = 2.0 // 少し高い位置から
+  posZ[count] = (Math.random() - 0.5) * (range * 2)
+
+  // 速度の初期化
+  velX[count] = 0
+  velY[count] = -0.01
+  velZ[count] = 0
 
   densities[count] = restDensity // 初期値を設定
 
-  colors[count * 3 + 0] = r //15 / 255
-  colors[count * 3 + 1] = g //227 / 255
-  colors[count * 3 + 2] = b //255 / 255
+  // 色の初期化
+  colorR[count] = r
+  colorG[count] = g
+  colorB[count] = b
 
   geometry.attributes.color.setXYZ(count, r, g, b)
+  geometry.attributes.position.setXYZ(
+    count,
+    posX[count],
+    posY[count],
+    posZ[count],
+  )
 
   showCount()
 
-  count += 1
+  count++
 
   geometry.attributes.color.count = count
   geometry.attributes.position.count = count
 
-  // フラグを立てる
   geometry.attributes.position.needsUpdate = true
   geometry.attributes.color.needsUpdate = true
 
   geometry.attributes.color.needsUpdate = true
   geometry.setDrawRange(0, count)
 }
-
 init()
 
 /******************************************************
@@ -234,254 +294,225 @@ init()
  * CUR
  *****************************************************/
 // 色計算
-let nextColors = new Float32Array(colors.length)
-function diffuseColor() {
-  const h = 0.5
+// let nextColors = new Float32Array(colors.length)
+// function diffuseColor() {
+//   const h = 0.5
 
-  for (let i = 0; i < count; i++) {
-    let rSum = 0,
-      gSum = 0,
-      bSum = 0
-    let weightSum = 0
+//   for (let i = 0; i < count; i++) {
+//     let rSum = 0,
+//       gSum = 0,
+//       bSum = 0
+//     let weightSum = 0
 
-    for (let j = 0; j < count; j++) {
-      if (i === j) continue
+//     for (let j = 0; j < count; j++) {
+//       if (i === j) continue
 
-      const dist = getDistance(i, j)
+//       const dist = getDistance(i, j)
 
-      if (dist > 0 && dist < h) {
-        const weight = 1 - dist / h
-        rSum += colors[j * 3 + 0] * weight
-        gSum += colors[j * 3 + 1] * weight
-        bSum += colors[j * 3 + 2] * weight
-        weightSum += weight
-      }
-    }
+//       if (dist > 0 && dist < h) {
+//         const weight = 1 - dist / h
+//         rSum += colors[j * 3 + 0] * weight
+//         gSum += colors[j * 3 + 1] * weight
+//         bSum += colors[j * 3 + 2] * weight
+//         weightSum += weight
+//       }
+//     }
 
-    if (weightSum > 0) {
-      nextColors[i * 3 + 0] = rSum / weightSum
-      nextColors[i * 3 + 1] = gSum / weightSum
-      nextColors[i * 3 + 2] = bSum / weightSum
-    } else {
-      nextColors[i * 3 + 0] = colors[i * 3 + 0]
-      nextColors[i * 3 + 1] = colors[i * 3 + 1]
-      nextColors[i * 3 + 2] = colors[i * 3 + 2]
-    }
-  }
-  colors.set(nextColors)
+//     if (weightSum > 0) {
+//       nextColors[i * 3 + 0] = rSum / weightSum
+//       nextColors[i * 3 + 1] = gSum / weightSum
+//       nextColors[i * 3 + 2] = bSum / weightSum
+//     } else {
+//       nextColors[i * 3 + 0] = colors[i * 3 + 0]
+//       nextColors[i * 3 + 1] = colors[i * 3 + 1]
+//       nextColors[i * 3 + 2] = colors[i * 3 + 2]
+//     }
+//   }
+//   colors.set(nextColors)
 
-  const colorAttr = geometry.attributes.color
+//   const colorAttr = geometry.attributes.color
 
-  for (let i = 0; i < count; i++) {
-    colorAttr.setXYZ(
-      i,
-      colors[i * 3 + 0], //
-      colors[i * 3 + 1],
-      colors[i * 3 + 2],
-    )
-  }
-  colorAttr.needsUpdate = true
-}
+//   for (let i = 0; i < count; i++) {
+//     colorAttr.setXYZ(
+//       i,
+//       colors[i * 3 + 0], //
+//       colors[i * 3 + 1],
+//       colors[i * 3 + 2],
+//     )
+//   }
+//   colorAttr.needsUpdate = true
+// }
 
 // 密度計算
-function calcDensities() {
-  for (let i = 0; i < count; i++) {
-    let d = 0
-    for (let j = 0; j < count; j++) {
-      const dx = pos[i * 3] - pos[j * 3],
-        dy = pos[i * 3 + 1] - pos[j * 3 + 1],
-        dz = pos[i * 3 + 2] - pos[j * 3 + 2]
-      const distSq = dx * dx + dy * dy + dz * dz
-      if (distSq < h * h) {
-        const w = 1.0 - Math.sqrt(distSq) / h
-        d += w * w // 二乗カーネル
-      }
-    }
-    densities[i] = Math.max(d, 0.0001)
-  }
-}
+// function calcDensities() {
+//   for (let i = 0; i < count; i++) {
+//     let d = 0
+//     for (let j = 0; j < count; j++) {
+//       const dx = pos[i * 3] - pos[j * 3],
+//         dy = pos[i * 3 + 1] - pos[j * 3 + 1],
+//         dz = pos[i * 3 + 2] - pos[j * 3 + 2]
+//       const distSq = dx * dx + dy * dy + dz * dz
+//       if (distSq < h * h) {
+//         const w = 1.0 - Math.sqrt(distSq) / h
+//         d += w * w // 二乗カーネル
+//       }
+//     }
+//     densities[i] = Math.max(d, 0.0001)
+//   }
+// }
 
 // 圧力・粘性計算
-function calcPressure() {
-  for (let i = 0; i < count; i++) {
-    for (let j = 0; j < count; j++) {
-      if (i === j) continue
-      const dx = pos[i * 3] - pos[j * 3],
-        dy = pos[i * 3 + 1] - pos[j * 3 + 1],
-        dz = pos[i * 3 + 2] - pos[j * 3 + 2]
-      const distSq = dx * dx + dy * dy + dz * dz
-      if (distSq < h * h && distSq > 0.0001) {
-        const dist = Math.sqrt(distSq)
-        const w = 1.0 - dist / h
+// function calcPressure() {
+//   for (let i = 0; i < count; i++) {
+//     for (let j = 0; j < count; j++) {
+//       if (i === j) continue
+//       const dx = pos[i * 3] - pos[j * 3],
+//         dy = pos[i * 3 + 1] - pos[j * 3 + 1],
+//         dz = pos[i * 3 + 2] - pos[j * 3 + 2]
+//       const distSq = dx * dx + dy * dy + dz * dz
+//       if (distSq < h * h && distSq > 0.0001) {
+//         const dist = Math.sqrt(distSq)
+//         const w = 1.0 - dist / h
 
-        // 圧力 (反発)
-        const p = stiffness * (densities[i] + densities[j] - 2 * restDensity)
-        const force = (p * w * w) / densities[j]
-        velocities[i * 3] += (dx / dist) * force * 0.01
-        velocities[i * 3 + 1] += (dy / dist) * force * 0.01
-        velocities[i * 3 + 2] += (dz / dist) * force * 0.01
+//         // 圧力 (反発)
+//         const p = stiffness * (densities[i] + densities[j] - 2 * restDensity)
+//         const force = (p * w * w) / densities[j]
+//         velocities[i * 3] += (dx / dist) * force * 0.01
+//         velocities[i * 3 + 1] += (dy / dist) * force * 0.01
+//         velocities[i * 3 + 2] += (dz / dist) * force * 0.01
 
-        // 粘性 (同期)
-        const vdx = velocities[j * 3] - velocities[i * 3]
-        const vdy = velocities[j * 3 + 1] - velocities[i * 3 + 1]
-        const vdz = velocities[j * 3 + 2] - velocities[i * 3 + 2]
-        velocities[i * 3] += vdx * viscosity * w * w
-        velocities[i * 3 + 1] += vdy * viscosity * w * w
-        velocities[i * 3 + 2] += vdz * viscosity * w * w
-      }
-    }
-  }
-}
+//         // 粘性 (同期)
+//         const vdx = velocities[j * 3] - velocities[i * 3]
+//         const vdy = velocities[j * 3 + 1] - velocities[i * 3 + 1]
+//         const vdz = velocities[j * 3 + 2] - velocities[i * 3 + 2]
+//         velocities[i * 3] += vdx * viscosity * w * w
+//         velocities[i * 3 + 1] += vdy * viscosity * w * w
+//         velocities[i * 3 + 2] += vdz * viscosity * w * w
+//       }
+//     }
+//   }
+// }
 
 // 物理更新と境界判定
-function calcPhysics() {
-  const floor_y = 1.5
-  const wall_x = 1.5
-  const wall_z = 1.5
+// function calcPhysics() {
+//   const floor_y = 1.5
+//   const wall_x = 1.5
+//   const wall_z = 1.5
 
-  for (let i = 0; i < count; i++) {
-    velocities[i * 3 + 1] += gravity
-    pos[i * 3] += velocities[i * 3]
-    pos[i * 3 + 1] += velocities[i * 3 + 1]
-    pos[i * 3 + 2] += velocities[i * 3 + 2]
+//   for (let i = 0; i < count; i++) {
+//     velocities[i * 3 + 1] += gravity
+//     pos[i * 3] += velocities[i * 3]
+//     pos[i * 3 + 1] += velocities[i * 3 + 1]
+//     pos[i * 3 + 2] += velocities[i * 3 + 2]
 
-    // 境界判定 (床と壁)
-    if (pos[i * 3 + 1] < -floor_y) {
-      pos[i * 3 + 1] = -floor_y
-      velocities[i * 3 + 1] *= -0.5
-    }
-    if (Math.abs(pos[i * 3]) > wall_x) {
-      pos[i * 3] = Math.sign(pos[i * 3]) * wall_z
-      velocities[i * 3] *= -0.5
-    }
-    if (Math.abs(pos[i * 3 + 2]) > wall_z) {
-      pos[i * 3 + 2] = Math.sign(pos[i * 3 + 2]) * wall_z
-      velocities[i * 3 + 2] *= -0.5
-    }
+//     // 境界判定 (床と壁)
+//     if (pos[i * 3 + 1] < -floor_y) {
+//       pos[i * 3 + 1] = -floor_y
+//       velocities[i * 3 + 1] *= -0.5
+//     }
+//     if (Math.abs(pos[i * 3]) > wall_x) {
+//       pos[i * 3] = Math.sign(pos[i * 3]) * wall_z
+//       velocities[i * 3] *= -0.5
+//     }
+//     if (Math.abs(pos[i * 3 + 2]) > wall_z) {
+//       pos[i * 3 + 2] = Math.sign(pos[i * 3 + 2]) * wall_z
+//       velocities[i * 3 + 2] *= -0.5
+//     }
 
-    // 減衰
-    velocities[i * 3] *= 0.99
-    velocities[i * 3 + 1] *= 0.99
-    velocities[i * 3 + 2] *= 0.99
-  }
-}
-// 非圧縮性
-// イテレーション回数（最初は2〜3で十分です）
-const MAX_ITERATIONS = 2
+//     // 減衰
+//     velocities[i * 3] *= 0.99
+//     velocities[i * 3 + 1] *= 0.99
+//     velocities[i * 3 + 2] *= 0.99
+//   }
+// }
+// // 非圧縮性
+// // イテレーション回数（最初は2〜3で十分です）
+// const MAX_ITERATIONS = 2
 
-function computeDensity() {
-  const pos = geometry.attributes.position.array
-  const h2 = h * h // 影響範囲の二乗（計算効率のため）
+// function computeDensity() {
+//   const pos = geometry.attributes.position.array
+//   const h2 = h * h // 影響範囲の二乗（計算効率のため）
 
-  for (let i = 0; i < count; i++) {
-    let d = 0
+//   for (let i = 0; i < count; i++) {
+//     let d = 0
 
-    // 自分の位置を取得
-    const xi = pos[i * 3 + 0]
-    const yi = pos[i * 3 + 1]
-    const zi = pos[i * 3 + 2]
+//     // 自分の位置を取得
+//     const xi = pos[i * 3 + 0]
+//     const yi = pos[i * 3 + 1]
+//     const zi = pos[i * 3 + 2]
 
-    for (let j = 0; j < count; j++) {
-      // 自分自身は含めない（あるいは含めるカーネルもあるが、基本は除外）
-      if (i === j) continue
+//     for (let j = 0; j < count; j++) {
+//       // 自分自身は含めない（あるいは含めるカーネルもあるが、基本は除外）
+//       if (i === j) continue
 
-      const dx = xi - pos[j * 3 + 0]
-      const dy = yi - pos[j * 3 + 1]
-      const dz = zi - pos[j * 3 + 2]
-      const distSq = dx * dx + dy * dy + dz * dz
+//       const dx = xi - pos[j * 3 + 0]
+//       const dy = yi - pos[j * 3 + 1]
+//       const dz = zi - pos[j * 3 + 2]
+//       const distSq = dx * dx + dy * dy + dz * dz
 
-      // 影響範囲内であれば計算
-      if (distSq < h2) {
-        const dist = Math.sqrt(distSq)
-        // 二乗カーネル (1 - r/h)^2
-        const w = 1.0 - dist / h
-        d += w * w
-      }
-    }
-    // 密度が0にならないよう微小値を加算
-    densities[i] = Math.max(d, 0.0001)
-  }
-}
+//       // 影響範囲内であれば計算
+//       if (distSq < h2) {
+//         const dist = Math.sqrt(distSq)
+//         // 二乗カーネル (1 - r/h)^2
+//         const w = 1.0 - dist / h
+//         d += w * w
+//       }
+//     }
+//     // 密度が0にならないよう微小値を加算
+//     densities[i] = Math.max(d, 0.0001)
+//   }
+// }
 
-function applyCorrection() {
-  // 密度が restDensity になるまで反復する
-  for (let iter = 0; iter < MAX_ITERATIONS; iter++) {
-    computeDensity() // 1. 最新の密度を計算
+// function applyCorrection() {
+//   // 密度が restDensity になるまで反復する
+//   for (let iter = 0; iter < MAX_ITERATIONS; iter++) {
+//     computeDensity() // 1. 最新の密度を計算
 
-    // 圧力による力を適用
-    for (let i = 0; i < count; i++) {
-      for (let j = 0; j < count; j++) {
-        if (i === j) continue
+//     // 圧力による力を適用
+//     for (let i = 0; i < count; i++) {
+//       for (let j = 0; j < count; j++) {
+//         if (i === j) continue
 
-        const dx = pos[i * 3] - pos[j * 3],
-          dy = pos[i * 3 + 1] - pos[j * 3 + 1],
-          dz = pos[i * 3 + 2] - pos[j * 3 + 2]
-        const distSq = dx * dx + dy * dy + dz * dz
+//         const dx = pos[i * 3] - pos[j * 3],
+//           dy = pos[i * 3 + 1] - pos[j * 3 + 1],
+//           dz = pos[i * 3 + 2] - pos[j * 3 + 2]
+//         const distSq = dx * dx + dy * dy + dz * dz
 
-        if (distSq < h * h && distSq > 0.0001) {
-          const dist = Math.sqrt(distSq)
-          const w = 1.0 - dist / h
+//         if (distSq < h * h && distSq > 0.0001) {
+//           const dist = Math.sqrt(distSq)
+//           const w = 1.0 - dist / h
 
-          // 圧力の差分を計算（密度のエラー分だけ強く反発させる）
-          const densityError = densities[i] - restDensity
-          const pressure = stiffness * densityError
+//           // 圧力の差分を計算（密度のエラー分だけ強く反発させる）
+//           const densityError = densities[i] - restDensity
+//           const pressure = stiffness * densityError
 
-          // 力を適用（密度が高いほど強く弾く）
-          const force = (pressure * w * w) / densities[i]
-          velocities[i * 3] += (dx / dist) * force * 0.05
-          velocities[i * 3 + 1] += (dy / dist) * force * 0.05
-          velocities[i * 3 + 2] += (dz / dist) * force * 0.05
-        }
-      }
-    }
-  }
-}
+//           // 力を適用（密度が高いほど強く弾く）
+//           const force = (pressure * w * w) / densities[i]
+//           velocities[i * 3] += (dx / dist) * force * 0.05
+//           velocities[i * 3 + 1] += (dy / dist) * force * 0.05
+//           velocities[i * 3 + 2] += (dz / dist) * force * 0.05
+//         }
+//       }
+//     }
+//   }
+// }
 
-function updateParticles_cur() {
-  // 色計算
-  diffuseColor()
+// function updateParticles_cur() {
+//   // 色計算
+//   diffuseColor()
 
-  // 密度計算
-  calcDensities()
+//   // 密度計算
+//   calcDensities()
 
-  // 圧力・粘性計算
-  calcPressure()
+//   // 圧力・粘性計算
+//   calcPressure()
 
-  // 物理更新と境界判定
-  calcPhysics()
+//   // 物理更新と境界判定
+//   calcPhysics()
 
-  // 非圧縮性
-  applyCorrection()
-}
-
-/******************************************************
- * 物理計算用バッファの定義
- *****************************************************/
-// 位置・速度・加速度（各粒子 x, y, z の3次元分確保）
-// 3次元座標を計算しやすいよう、X, Y, Zそれぞれの配列で管理するのがコツです
-const posX = new Float32Array(MAX_PARTICLES)
-const posY = new Float32Array(MAX_PARTICLES)
-const posZ = new Float32Array(MAX_PARTICLES)
-
-const velX = new Float32Array(MAX_PARTICLES)
-const velY = new Float32Array(MAX_PARTICLES)
-const velZ = new Float32Array(MAX_PARTICLES)
-
-const accX = new Float32Array(MAX_PARTICLES)
-const accY = new Float32Array(MAX_PARTICLES)
-const accZ = new Float32Array(MAX_PARTICLES)
-
-// 各粒子の色情報を管理するバッファ
-const colorR = new Float32Array(MAX_PARTICLES)
-const colorG = new Float32Array(MAX_PARTICLES)
-const colorB = new Float32Array(MAX_PARTICLES)
-
-// 物理状態用のバッファ
-const densityBuffer = new Float32Array(MAX_PARTICLES)
-const pressureBuffer = new Float32Array(MAX_PARTICLES)
-
-// 質量用（初期値はすべて 1.0 に埋めておくと密度計算が楽です）
-const massBuffer = new Float32Array(MAX_PARTICLES).fill(1.0)
+//   // 非圧縮性
+//   applyCorrection()
+// }
 
 /******************************************************
  * 粒子の更新 （メインループ）
@@ -496,8 +527,17 @@ function updateParticles(dt) {
   }
 
   // 1. 密度と圧力の更新（状態決定）
+  // for (let i = 0; i < count; i++) {
+  //   densityBuffer[i] = getWeightedAverage(massBuffer, i, allNeighbors[i])
+  //   pressureBuffer[i] = calculatePressureFromDensity(densityBuffer[i])
+  // }
+
+  // 1. 密度と圧力の更新
   for (let i = 0; i < count; i++) {
-    densityBuffer[i] = getWeightedAverage(massBuffer, i, allNeighbors[i])
+    // 変更点：getWeightedAverage ではなく getWeightedSum を使う！
+    // 質量（massBuffer）の重み付き合計が、その点の密度になります
+    densityBuffer[i] = getWeightedSum(massBuffer, i, allNeighbors[i])
+
     pressureBuffer[i] = calculatePressureFromDensity(densityBuffer[i])
   }
 
@@ -505,12 +545,29 @@ function updateParticles(dt) {
   for (let i = 0; i < count; i++) {
     // 汎用エンジンを使って、力をベクトルとして算出
     const force = calculateTotalForce(i, allNeighbors[i])
-    velocities[i] += force * dt
+
+    // 重力の影響もここに入れると良いです
+    velY[i] -= 9.8 * dt
+
+    // 力（加速度）を速度に反映
+    velX[i] += force.x * dt
+    velY[i] += force.y * dt
+    velZ[i] += force.z * dt
   }
 
   // 3. 物理更新（積分・境界判定）
   for (let i = 0; i < count; i++) {
-    pos[i] += velocities[i] * dt
+    // 【ここに減衰処理を追加】
+    const damping = 0.99 // 1より少し小さい値を掛ける
+    velX[i] *= damping
+    velY[i] *= damping
+    velZ[i] *= damping
+
+    // 位置の更新
+    posX[i] += velX[i] * dt
+    posY[i] += velY[i] * dt
+    posZ[i] += velZ[i] * dt
+
     applyBoundary(i)
   }
 
@@ -578,7 +635,7 @@ function applyBoundary(i) {
   const floorY = -1.5
   const wallX = 1.5
   const wallZ = 1.5
-  const restitution = 0.5 // 反発係数（1.0で完全弾性衝突、0で全く跳ね返らない）
+  const restitution = 0.01 // 反発係数（1.0で完全弾性衝突、0で全く跳ね返らない）
 
   // 床（Y軸の下限）
   if (posY[i] < floorY) {
@@ -657,6 +714,15 @@ function getWeightedAverage(targetPropertyArray, i, neighbors, propetySize) {
   return weightSum > 0 ? sum / weightSum : targetPropertyArray[i]
 }
 
+// 【密度計算用：平均ではなく、重みの合計を出す】
+function getWeightedSum(targetPropertyArray, i, neighbors) {
+  let sum = 0
+  for (const n of neighbors) {
+    sum += targetPropertyArray[n.index] * n.weight
+  }
+  return sum
+}
+
 /******************************************************
  * フレーム更新
  *****************************************************/
@@ -669,8 +735,8 @@ function animate() {
 
   const dt = Math.min(clock.getDelta(), 0.033) // 最大でも 0.033秒(約30fps相当)までに制限
 
-  updateParticles_cur()
-  // updateParticles(dt)
+  // updateParticles_cur()
+  updateParticles(dt)
 
   controls.update()
 
