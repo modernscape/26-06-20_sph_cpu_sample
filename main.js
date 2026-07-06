@@ -142,26 +142,6 @@ let colors = new Float32Array(MAX_PARTICLES * 3)
 const RESET_INTERVAL = 8000 // 5000ms = 5秒
 let lastResetTime = Date.now()
 
-// 粒子を初期化する関数
-// function initParticles_old() {
-//   for (let i = 0; i < MAX_PARTICLES; i++) {
-//     // 速度もリセット
-//     velocities[i * 3 + 0] = 0
-//     velocities[i * 3 + 1] = 0
-//     velocities[i * 3 + 2] = 0
-
-//     // 色
-//     colors[i * 3 + 0] = 15 / 255
-//     colors[i * 3 + 1] = 227 / 255
-//     colors[i * 3 + 2] = 0.7
-//   }
-
-//   geometry.setDrawRange(0, count)
-//   geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3))
-
-//   lastResetTime = Date.now()
-// }
-
 function initParticles() {
   for (let i = 0; i < MAX_PARTICLES; i++) {
     // 速度もリセット
@@ -206,16 +186,6 @@ function activateParticles(n) {
     count += 1
   }
 }
-// activateParticles(1000)
-
-// geometry.attributes.color.count = count
-// geometry.attributes.position.count = count
-
-// geometry.attributes.position.needsUpdate = true
-// geometry.attributes.color.needsUpdate = true
-
-// geometry.attributes.color.needsUpdate = true
-// geometry.setDrawRange(0, count)
 
 showCount()
 
