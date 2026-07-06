@@ -198,16 +198,6 @@ async function init() {
   addBtn.disabled = false
 }
 
-// function accumulateParticles(num, r, g, b) {
-//   const timer = setInterval(() => {
-//     addParticle(r, g, b)
-//     if (count > num) {
-//       addBtn.disabled = false
-//       clearInterval(timer)
-//     }
-//   }, 0.05)
-// }
-
 function addParticleSeqentially(num, r, g, b, intervalMs = 10) {
   return new Promise((resolve) => {
     let added = 0
