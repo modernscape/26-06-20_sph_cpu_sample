@@ -36,8 +36,8 @@ addBtn.addEventListener("click", () => {
 const MAX_PARTICLES = 5000
 let count = 0
 const h = 0.6 // 影響範囲
-const restDensity = 3.0 // 理想密度
-const stiffness = 10 //0.5 // 圧力係数
+const restDensity = 10.0 // 理想密度
+const stiffness = 50 //10 //0.5 // 圧力係数
 // const viscosity = 0.15 // 粘度係数
 // const gravity = -0.005
 
@@ -588,15 +588,16 @@ function updateParticles(dt) {
  */
 function calculatePressureFromDensity(density) {
   // 1. 理想密度との差分を求める
-  const densityError = density - restDensity
+  // const densityError = density - restDensity
 
   // 2. 差分に係数（stiffness）を掛けて圧力にする
   // 密度が理想より高ければプラス（押し出す力）、低ければマイナス（吸い寄せる力）になります
-  let pressure = stiffness * densityError
+  let pressure = stiffness * (density - restDensity)
 
   // 3. 負の圧力（吸い込み）は液体ではあまり起こらないため、0以上にする（任意）
   // 完全に「水」のように振る舞わせたい場合は、ここを Math.max(0, pressure) にします
-  return pressure
+  // return pressure
+  return Math.max(0, Math.min(pressure, 50.0))
 }
 
 // 2. 力の計算（圧力勾配・粘性）
@@ -635,7 +636,7 @@ function applyBoundary(i) {
   const floorY = -1.5
   const wallX = 1.5
   const wallZ = 1.5
-  const restitution = 0.01 // 反発係数（1.0で完全弾性衝突、0で全く跳ね返らない）
+  const restitution = 0.001 // 反発係数（1.0で完全弾性衝突、0で全く跳ね返らない）
 
   // 床（Y軸の下限）
   if (posY[i] < floorY) {
@@ -673,26 +674,24 @@ function applyColorDiffusion(i, neighbors) {
 /******************************************************
  * 汎用関数
  *****************************************************/
-// 距離
+// 1. 距離計算（バラバラの配列を参照しているか）
 function getDistance(i, j) {
-  const dx = pos[j * 3 + 0] - pos[i * 3 + 0]
-  const dy = pos[j * 3 + 1] - pos[i * 3 + 1]
-  const dz = pos[j * 3 + 2] - pos[i * 3 + 2]
+  const dx = posX[j] - posX[i]
+  const dy = posY[j] - posY[i]
+  const dz = posZ[j] - posZ[i]
   return Math.sqrt(dx * dx + dy * dy + dz * dz)
 }
 
-// 近傍探索
+// 2. 近傍探索（EPSILON保護はあるか）
 function getNeighbors(i) {
   let neighbors = []
+  const EPSILON = 0.0001
   for (let j = 0; j < count; j++) {
     if (i === j) continue
     const dist = getDistance(i, j)
-    if (0 < dist && dist < h) {
+    if (dist > EPSILON && dist < h) {
       const weight = calculateWeight(dist, h)
-      neighbors.push({
-        index: j, //
-        weight: weight,
-      })
+      neighbors.push({ index: j, weight: weight })
     }
   }
   return neighbors
