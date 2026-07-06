@@ -161,31 +161,31 @@ function initParticles() {
 }
 // initParticles()
 
-function activateParticles(n) {
-  if (n >= MAX_PARTICLES) return
+// function activateParticles(n) {
+//   if (n >= MAX_PARTICLES) return
 
-  for (let i = 0; i < n; i++) {
-    const range = 0.2
-    posArray[i * 3 + 0] = (Math.random() - range) * (range * 2)
-    posArray[i * 3 + 1] = 2.0 // 少し高い位置から
-    posArray[i * 3 + 2] = (Math.random() - range) * (range * 2)
+//   for (let i = 0; i < n; i++) {
+//     const range = 0.2
+//     posArray[i * 3 + 0] = (Math.random() - range) * (range * 2)
+//     posArray[i * 3 + 1] = 2.0 // 少し高い位置から
+//     posArray[i * 3 + 2] = (Math.random() - range) * (range * 2)
 
-    velocities[i * 3 + 0] = 0
-    velocities[i * 3 + 1] = -0.02 // 下向きの初速
-    velocities[i * 3 + 2] = 0
+//     velocities[i * 3 + 0] = 0
+//     velocities[i * 3 + 1] = -0.02 // 下向きの初速
+//     velocities[i * 3 + 2] = 0
 
-    densities[i] = restDensity // 初期値を設定
+//     densities[i] = restDensity // 初期値を設定
 
-    // 水色にする
-    colors[i * 3 + 0] = 15 / 255
-    colors[i * 3 + 1] = 227 / 255
-    colors[i * 3 + 2] = 255 / 255
+//     // 水色にする
+//     colors[i * 3 + 0] = 15 / 255
+//     colors[i * 3 + 1] = 227 / 255
+//     colors[i * 3 + 2] = 255 / 255
 
-    geometry.attributes.color.setXYZ(i, 15 / 255, 227 / 255, 255 / 255)
-    // 2. 粒子数を更新
-    count += 1
-  }
-}
+//     geometry.attributes.color.setXYZ(i, 15 / 255, 227 / 255, 255 / 255)
+//     // 2. 粒子数を更新
+//     count += 1
+//   }
+// }
 
 showCount()
 
