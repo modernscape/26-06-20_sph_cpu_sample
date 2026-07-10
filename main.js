@@ -20,7 +20,7 @@ const MAX_PARTICLES = 5000
 let particleCount = 0
 
 /******************************************************
- * データ
+ * データ (Data)
  *****************************************************/
 
 const posX = new Float32Array(MAX_PARTICLES)
@@ -31,26 +31,27 @@ const velX = new Float32Array(MAX_PARTICLES)
 const velY = new Float32Array(MAX_PARTICLES)
 const velZ = new Float32Array(MAX_PARTICLES)
 
-const forceX = new Float32Array(MAX_PARTICLES)
-const forceY = new Float32Array(MAX_PARTICLES)
-const forceZ = new Float32Array(MAX_PARTICLES)
+// const forceX = new Float32Array(MAX_PARTICLES)
+// const forceY = new Float32Array(MAX_PARTICLES)
+// const forceZ = new Float32Array(MAX_PARTICLES)
 
-const density = new Float32Array(MAX_PARTICLES)
-const pressure = new Float32Array(MAX_PARTICLES)
-const mass = new Float32Array(MAX_PARTICLES)
+// const density = new Float32Array(MAX_PARTICLES)
+// const pressure = new Float32Array(MAX_PARTICLES)
+
+const mass = new Float32Array(MAX_PARTICLES).fill(1)
 
 const colorR = new Float32Array(MAX_PARTICLES)
 const colorG = new Float32Array(MAX_PARTICLES)
 const colorB = new Float32Array(MAX_PARTICLES)
 
 // Position Based Fluids
-const lambda = new Float32Array(MAX_PARTICLES)
-const deltaPosX = new Float32Array(MAX_PARTICLES)
-const deltaPosY = new Float32Array(MAX_PARTICLES)
-const deltaPosZ = new Float32Array(MAX_PARTICLES)
+// const lambda = new Float32Array(MAX_PARTICLES)
+// const deltaPosX = new Float32Array(MAX_PARTICLES)
+// const deltaPosY = new Float32Array(MAX_PARTICLES)
+// const deltaPosZ = new Float32Array(MAX_PARTICLES)
 
 /******************************************************
- * シーン構築
+ * シーン構築 （View）
  *****************************************************/
 const scene = new THREE.Scene()
 const camera = new THREE.PerspectiveCamera(
@@ -72,17 +73,26 @@ controls.maxDistance = 10000
 controls.minPolarAngle = 0
 controls.maxPolarAngle = Math.PI
 
+const axes = new THREE.AxesHelper(1)
+scene.add(axes)
+
+const clock = new THREE.Clock()
+
 /******************************************************
- * points オブジェクト
+ * points オブジェクト （View）
  *****************************************************/
 const geometry = new THREE.BufferGeometry()
 const posArray = new Float32Array(MAX_PARTICLES * 3)
 const colorArray = new Float32Array(MAX_PARTICLES * 3)
 
-geometry.setAttribute("position", new THREE.BufferAttribute(posArray, 3))
-geometry.setAttribute("color", new THREE.BufferAttribute(colorArray, 3))
+const positionAttribute = new THREE.BufferAttribute(posArray, 3)
+positionAttribute.setUsage(THREE.DynamicCopyUsage)
+geometry.setAttribute("position", positionAttribute)
+const colorAttribute = new THREE.BufferAttribute(colorArray, 3)
+colorAttribute.setUsage(THREE.DynamicCopyUsage)
+geometry.setAttribute("color", colorAttribute)
 const material = new THREE.PointsMaterial({
-  size: 0.02,
+  size: 0.01,
   transparent: false,
   vertexColors: true,
   opacity: 0.8,
@@ -94,21 +104,25 @@ points.geometry.boundingSphere.radius += 10
 scene.add(points)
 
 /******************************************************
- * initParticles()
+ * initParticles() (Data)
  *****************************************************/
-async function initParticles(num) {
-  const range = 1.0
+function initParticles(num) {
+  const spacing = 0.05
+  const cols = Math.floor(Math.sqrt(num))
   for (let i = 0; i < num; i++) {
+    const x = i % cols // 列
+    const z = Math.floor(i / cols) // 行
+
     createParticle(
-      (Math.random() - 0.5) * (range * 2),
-      0.0,
-      (Math.random() - 0.5) * (range * 2),
-      0.0,
-      0.0,
-      0.0,
-      1.0,
-      0.0,
-      0.0,
+      x * spacing - (cols * spacing) / 2, //
+      0,
+      z * spacing - (cols * spacing) / 2,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
     )
   }
 }
@@ -131,30 +145,35 @@ function createParticle(x, y, z, vx, vy, vz, r, g, b) {
   colorB[i] = b
 }
 
-initParticles(10)
+initParticles(20 * 20)
+
 animate()
 
 function updateGeometry() {
   for (let i = 0; i < particleCount; i++) {
-    geometry.attributes.position.setXYZ(i, posX[i], posY[i], posZ[i])
-    geometry.attributes.color.setXYZ(i, colorR[i], colorG[i], colorB[i])
+    positionAttribute.setXYZ(i, posX[i], posY[i], posZ[i])
+    colorAttribute.setXYZ(i, colorR[i], colorG[i], colorB[i])
   }
   geometry.attributes.position.needsUpdate = true
   geometry.attributes.color.needsUpdate = true
+  geometry.setDrawRange(0, particleCount)
 }
 
 /******************************************************
- * updateParticles()
+ * updateParticles() (System)
  *****************************************************/
-function updateParticles() {}
+function updateParticles(dt) {}
 
 /******************************************************
  * animate()
  *****************************************************/
+
 function animate() {
   requestAnimationFrame(animate)
 
-  updateParticles()
+  const dt = clock.getDelta()
+
+  updateParticles(dt)
 
   updateGeometry()
 
