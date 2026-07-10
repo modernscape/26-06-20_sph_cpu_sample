@@ -86,10 +86,10 @@ const posArray = new Float32Array(MAX_PARTICLES * 3)
 const colorArray = new Float32Array(MAX_PARTICLES * 3)
 
 const positionAttribute = new THREE.BufferAttribute(posArray, 3)
-positionAttribute.setUsage(THREE.DynamicCopyUsage)
+positionAttribute.setUsage(THREE.DynamicDrawUsage)
 geometry.setAttribute("position", positionAttribute)
 const colorAttribute = new THREE.BufferAttribute(colorArray, 3)
-colorAttribute.setUsage(THREE.DynamicCopyUsage)
+colorAttribute.setUsage(THREE.DynamicDrawUsage)
 geometry.setAttribute("color", colorAttribute)
 const material = new THREE.PointsMaterial({
   size: 0.01,
@@ -104,7 +104,7 @@ points.geometry.boundingSphere.radius += 10
 scene.add(points)
 
 /******************************************************
- * initParticles() (Data)
+ * initParticles() (System)
  *****************************************************/
 function initParticles(num) {
   const spacing = 0.05
@@ -127,6 +127,9 @@ function initParticles(num) {
   }
 }
 
+/******************************************************
+ * createParticle() (System)
+ *****************************************************/
 function createParticle(x, y, z, vx, vy, vz, r, g, b) {
   if (particleCount >= MAX_PARTICLES) return
 
@@ -145,17 +148,13 @@ function createParticle(x, y, z, vx, vy, vz, r, g, b) {
   colorB[i] = b
 }
 
-initParticles(20 * 20)
-
-animate()
-
 function updateGeometry() {
   for (let i = 0; i < particleCount; i++) {
     positionAttribute.setXYZ(i, posX[i], posY[i], posZ[i])
     colorAttribute.setXYZ(i, colorR[i], colorG[i], colorB[i])
   }
-  geometry.attributes.position.needsUpdate = true
-  geometry.attributes.color.needsUpdate = true
+  positionAttribute.needsUpdate = true
+  colorAttribute.needsUpdate = true
   geometry.setDrawRange(0, particleCount)
 }
 
@@ -181,3 +180,6 @@ function animate() {
 
   renderer.render(scene, camera)
 }
+
+initParticles(20 * 20)
+animate()
