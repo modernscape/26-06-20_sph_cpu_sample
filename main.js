@@ -1,40 +1,27 @@
 import * as THREE from "three"
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js"
 
-// STEP 1
-// □ 定数
-// □ Particle Buffers
-// □ Scene
-// □ Camera
-// □ Renderer
-// □ Controls
-// □ Geometry
-// □ Material
-// □ Points
-// □ initParticles()
-// □ updateParticles()
-// □ updateGeometry()
-// □ animate()
-// □ resize()
+/******************************************************
+ * UI
+ *****************************************************/
+window.addEventListener("resize", onWindowResize, false)
+
+function onWindowResize() {
+  camera.aspect = window.innerWidth / window.innerHeight
+  camera.updateProjectionMatrix()
+  renderer.setSize(window.innerWidth, window.innerHeight)
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+}
 
 /******************************************************
  * 定数
  *****************************************************/
 const MAX_PARTICLES = 5000
-let count = 0
+let particleCount = 0
 
 /******************************************************
- * データ構造
+ * データ
  *****************************************************/
-// Position
-// Velocity
-// Force
-// Density
-// Pressure
-// Mass
-// Color
-// Lambda
-// DeltaPosition
 
 const posX = new Float32Array(MAX_PARTICLES)
 const posY = new Float32Array(MAX_PARTICLES)
@@ -90,12 +77,14 @@ controls.maxPolarAngle = Math.PI
  *****************************************************/
 const geometry = new THREE.BufferGeometry()
 const posArray = new Float32Array(MAX_PARTICLES * 3)
+const colorArray = new Float32Array(MAX_PARTICLES * 3)
 
 geometry.setAttribute("position", new THREE.BufferAttribute(posArray, 3))
+geometry.setAttribute("color", new THREE.BufferAttribute(colorArray, 3))
 const material = new THREE.PointsMaterial({
   size: 0.02,
   transparent: false,
-  color: 0xff0000,
+  vertexColors: true,
   opacity: 0.8,
 })
 
@@ -107,47 +96,52 @@ scene.add(points)
 /******************************************************
  * initParticles()
  *****************************************************/
-async function initParticles() {
-  await addParticleSeqentially(200)
-}
-
-// 粒子を順番に追加
-function addParticleSeqentially(num, intervalMs = 10) {
-  return new Promise((resolve) => {
-    let added = 0
-    const timer = setInterval(() => {
-      addParticle()
-      added++
-      if (added >= num) {
-        clearInterval(timer)
-        resolve()
-      }
-    }, intervalMs)
-  })
-}
-
-// 粒子を追加
-function addParticle() {
-  if (count >= MAX_PARTICLES) return
-
+async function initParticles(num) {
   const range = 1.0
-  posX[count] = (Math.random() - 0.5) * (range * 2)
-  posY[count] = 0.0
-  posZ[count] = (Math.random() - 0.5) * (range * 2)
-
-  geometry.attributes.position.setXYZ(
-    count,
-    posX[count],
-    posY[count],
-    posZ[count],
-  )
-  geometry.attributes.position.needsUpdate = true
-
-  count++
+  for (let i = 0; i < num; i++) {
+    createParticle(
+      (Math.random() - 0.5) * (range * 2),
+      0.0,
+      (Math.random() - 0.5) * (range * 2),
+      0.0,
+      0.0,
+      0.0,
+      1.0,
+      0.0,
+      0.0,
+    )
+  }
 }
 
-initParticles()
+function createParticle(x, y, z, vx, vy, vz, r, g, b) {
+  if (particleCount >= MAX_PARTICLES) return
+
+  const i = particleCount++
+
+  posX[i] = x
+  posY[i] = y
+  posZ[i] = z
+
+  velX[i] = vx
+  velY[i] = vy
+  velZ[i] = vz
+
+  colorR[i] = r
+  colorG[i] = g
+  colorB[i] = b
+}
+
+initParticles(10)
 animate()
+
+function updateGeometry() {
+  for (let i = 0; i < particleCount; i++) {
+    geometry.attributes.position.setXYZ(i, posX[i], posY[i], posZ[i])
+    geometry.attributes.color.setXYZ(i, colorR[i], colorG[i], colorB[i])
+  }
+  geometry.attributes.position.needsUpdate = true
+  geometry.attributes.color.needsUpdate = true
+}
 
 /******************************************************
  * updateParticles()
@@ -162,6 +156,9 @@ function animate() {
 
   updateParticles()
 
-  renderer.render(scene, camera)
+  updateGeometry()
+
   controls.update()
+
+  renderer.render(scene, camera)
 }
