@@ -187,5 +187,5 @@ function animate() {
   renderer.render(scene, camera)
 }
 
-createGridParticles(320)
+createGridParticles(900)
 animate()
