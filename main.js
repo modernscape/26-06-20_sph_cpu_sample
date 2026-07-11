@@ -172,7 +172,6 @@ function updateParticles(dt) {}
 /******************************************************
  * animate()
  *****************************************************/
-
 function animate() {
   requestAnimationFrame(animate)
 
