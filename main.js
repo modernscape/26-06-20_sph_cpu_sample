@@ -17,6 +17,7 @@ function onWindowResize() {
  * 定数
  *****************************************************/
 const MAX_PARTICLES = 5000
+const PARTICLE_SPACING = 0.05
 let particleCount = 0
 
 /******************************************************
@@ -106,17 +107,22 @@ scene.add(points)
 /******************************************************
  * initParticles() (System)
  *****************************************************/
-function initParticles(num) {
-  const spacing = 0.05
+function createGridParticles(num) {
+  const centerOffset = 0.5
   const cols = Math.floor(Math.sqrt(num))
+  const rows = Math.ceil(num / cols)
+
   for (let i = 0; i < num; i++) {
-    const x = i % cols // 列
-    const z = Math.floor(i / cols) // 行
+    const col = i % cols
+    const row = Math.floor(i / cols)
+
+    const x = PARTICLE_SPACING * (col - cols * centerOffset + centerOffset)
+    const z = PARTICLE_SPACING * (row - rows * centerOffset + centerOffset)
 
     createParticle(
-      x * spacing - (cols * spacing) / 2, //
+      x, //
       0,
-      z * spacing - (cols * spacing) / 2,
+      z,
       0,
       0,
       0,
@@ -181,5 +187,5 @@ function animate() {
   renderer.render(scene, camera)
 }
 
-initParticles(20 * 20)
+createGridParticles(320)
 animate()
