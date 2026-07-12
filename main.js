@@ -22,6 +22,8 @@ const MAX_PARTICLES = 5000
 // Constants : Simulation Parameters
 // ======================
 const PARTICLE_SPACING = 0.05
+const KERNEL_RADIUS = 0.1
+const CELL_SIZE = 0.1
 
 // ======================
 // Constants : Fluid Parameters
@@ -196,6 +198,24 @@ function createParticle(x, y, z, vx, vy, vz, r, g, b) {
 }
 
 /******************************************************
+ * System : Uniform Grid
+ *****************************************************/
+const grid = new Map()
+function updateUniformGrid() {
+  grid.clear()
+  for (let i = 0; i < particleCount; i++) {
+    const a = Math.floor(posX[i] / CELL_SIZE)
+    const b = Math.floor(posY[i] / CELL_SIZE)
+    const c = Math.floor(posZ[i] / CELL_SIZE)
+    const key = `${a},${b},${c}`
+    if (!grid.has(key)) {
+      grid.set(key, [])
+    }
+    grid.get(key).push(i)
+  }
+}
+
+/******************************************************
  * System : updateParticles()
  *****************************************************/
 function updateParticles(dt) {}
@@ -224,6 +244,8 @@ function animate() {
   const dt = clock.getDelta()
 
   updateParticles(dt)
+
+  // updateUniformGrid()
 
   updateGeometry()
 
