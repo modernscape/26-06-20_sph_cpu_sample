@@ -286,9 +286,8 @@ function animate() {
  *****************************************************/
 createGridParticles(900)
 updateUniformGrid()
-console.log(grid)
 
-const neighbors = findNeighbors(150)
+const neighbors = findNeighbors(50)
 console.log(neighbors)
 
 animate()
