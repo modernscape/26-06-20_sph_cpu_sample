@@ -13,24 +13,49 @@ function onWindowResize() {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
 }
 
-/******************************************************
- * 定数
- *****************************************************/
+// ==========================
+// Constants : Engine Parameters
+// ==========================
 const MAX_PARTICLES = 5000
+
+// ======================
+// Constants : Simulation Parameters
+// ======================
 const PARTICLE_SPACING = 0.05
-let particleCount = 0
+
+// ======================
+// Constants : Fluid Parameters
+// ======================
+
+// ======================
+// Constants : Rendering Parameters
+// ======================
 
 /******************************************************
- * データ (Data)
+ * Data : Position
  *****************************************************/
-
 const posX = new Float32Array(MAX_PARTICLES)
 const posY = new Float32Array(MAX_PARTICLES)
 const posZ = new Float32Array(MAX_PARTICLES)
 
+/******************************************************
+ * Data : Velocity
+ *****************************************************/
 const velX = new Float32Array(MAX_PARTICLES)
 const velY = new Float32Array(MAX_PARTICLES)
 const velZ = new Float32Array(MAX_PARTICLES)
+
+/******************************************************
+ * Data : Mass
+ *****************************************************/
+const mass = new Float32Array(MAX_PARTICLES).fill(1)
+
+/******************************************************
+ * Data : Color
+ *****************************************************/
+const colorR = new Float32Array(MAX_PARTICLES)
+const colorG = new Float32Array(MAX_PARTICLES)
+const colorB = new Float32Array(MAX_PARTICLES)
 
 // const forceX = new Float32Array(MAX_PARTICLES)
 // const forceY = new Float32Array(MAX_PARTICLES)
@@ -39,22 +64,22 @@ const velZ = new Float32Array(MAX_PARTICLES)
 // const density = new Float32Array(MAX_PARTICLES)
 // const pressure = new Float32Array(MAX_PARTICLES)
 
-const mass = new Float32Array(MAX_PARTICLES).fill(1)
-
-const colorR = new Float32Array(MAX_PARTICLES)
-const colorG = new Float32Array(MAX_PARTICLES)
-const colorB = new Float32Array(MAX_PARTICLES)
-
 // Position Based Fluids
 // const lambda = new Float32Array(MAX_PARTICLES)
 // const deltaPosX = new Float32Array(MAX_PARTICLES)
 // const deltaPosY = new Float32Array(MAX_PARTICLES)
 // const deltaPosZ = new Float32Array(MAX_PARTICLES)
 
+let particleCount = 0
+
 /******************************************************
- * シーン構築 （View）
+ * View : Scene
  *****************************************************/
 const scene = new THREE.Scene()
+
+/******************************************************
+ * View : Camera
+ *****************************************************/
 const camera = new THREE.PerspectiveCamera(
   75,
   window.innerWidth / window.innerHeight,
@@ -65,33 +90,40 @@ camera.position.x = 0
 camera.position.y = 1
 camera.position.z = 1
 
+/******************************************************
+ * View : Renderer
+ *****************************************************/
 const renderer = new THREE.WebGLRenderer({ antialias: true })
 renderer.setSize(window.innerWidth, window.innerHeight)
 document.getElementById("app").appendChild(renderer.domElement)
+
+/******************************************************
+ * View : Controls
+ *****************************************************/
 const controls = new OrbitControls(camera, renderer.domElement)
 controls.minDistance = 0
 controls.maxDistance = 10000
 controls.minPolarAngle = 0
 controls.maxPolarAngle = Math.PI
 
-const axes = new THREE.AxesHelper(1)
-scene.add(axes)
-
-const clock = new THREE.Clock()
-
 /******************************************************
- * points オブジェクト （View）
+ * View : Geometry
  *****************************************************/
 const geometry = new THREE.BufferGeometry()
-const posArray = new Float32Array(MAX_PARTICLES * 3)
-const colorArray = new Float32Array(MAX_PARTICLES * 3)
 
+const posArray = new Float32Array(MAX_PARTICLES * 3)
 const positionAttribute = new THREE.BufferAttribute(posArray, 3)
 positionAttribute.setUsage(THREE.DynamicDrawUsage)
 geometry.setAttribute("position", positionAttribute)
+
+const colorArray = new Float32Array(MAX_PARTICLES * 3)
 const colorAttribute = new THREE.BufferAttribute(colorArray, 3)
 colorAttribute.setUsage(THREE.DynamicDrawUsage)
 geometry.setAttribute("color", colorAttribute)
+
+/******************************************************
+ * View : Material
+ *****************************************************/
 const material = new THREE.PointsMaterial({
   size: 0.01,
   transparent: false,
@@ -99,13 +131,22 @@ const material = new THREE.PointsMaterial({
   opacity: 0.8,
 })
 
+/******************************************************
+ * View : Points
+ *****************************************************/
 const points = new THREE.Points(geometry, material)
 points.geometry.computeBoundingSphere()
 points.geometry.boundingSphere.radius += 10
 scene.add(points)
 
 /******************************************************
- * initParticles() (System)
+ * View : Misc.
+ *****************************************************/
+const axes = new THREE.AxesHelper(1)
+scene.add(axes)
+
+/******************************************************
+ * System : initParticles()
  *****************************************************/
 function createGridParticles(num) {
   const centerOffset = 0.5
@@ -134,7 +175,7 @@ function createGridParticles(num) {
 }
 
 /******************************************************
- * createParticle() (System)
+ * System : createParticle()
  *****************************************************/
 function createParticle(x, y, z, vx, vy, vz, r, g, b) {
   if (particleCount >= MAX_PARTICLES) return
@@ -154,6 +195,14 @@ function createParticle(x, y, z, vx, vy, vz, r, g, b) {
   colorB[i] = b
 }
 
+/******************************************************
+ * System : updateParticles()
+ *****************************************************/
+function updateParticles(dt) {}
+
+/******************************************************
+ * System : updateGeometry()
+ *****************************************************/
 function updateGeometry() {
   for (let i = 0; i < particleCount; i++) {
     positionAttribute.setXYZ(i, posX[i], posY[i], posZ[i])
@@ -165,13 +214,10 @@ function updateGeometry() {
 }
 
 /******************************************************
- * updateParticles() (System)
+ * System : animate()
  *****************************************************/
-function updateParticles(dt) {}
+const clock = new THREE.Clock()
 
-/******************************************************
- * animate()
- *****************************************************/
 function animate() {
   requestAnimationFrame(animate)
 
@@ -186,5 +232,8 @@ function animate() {
   renderer.render(scene, camera)
 }
 
+/******************************************************
+ * System : Execution
+ *****************************************************/
 createGridParticles(900)
 animate()
