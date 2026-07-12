@@ -89,8 +89,8 @@ const camera = new THREE.PerspectiveCamera(
   10000,
 )
 camera.position.x = 0
-camera.position.y = 1
-camera.position.z = 1
+camera.position.y = 1.5
+camera.position.z = 1.5
 
 /******************************************************
  * View : Renderer
@@ -198,24 +198,6 @@ function createParticle(x, y, z, vx, vy, vz, r, g, b) {
 }
 
 /******************************************************
- * System : Uniform Grid
- *****************************************************/
-const grid = new Map()
-function updateUniformGrid() {
-  grid.clear()
-  for (let i = 0; i < particleCount; i++) {
-    const a = Math.floor(posX[i] / CELL_SIZE)
-    const b = Math.floor(posY[i] / CELL_SIZE)
-    const c = Math.floor(posZ[i] / CELL_SIZE)
-    const key = `${a},${b},${c}`
-    if (!grid.has(key)) {
-      grid.set(key, [])
-    }
-    grid.get(key).push(i)
-  }
-}
-
-/******************************************************
  * System : updateParticles()
  *****************************************************/
 function updateParticles(dt) {}
@@ -234,6 +216,50 @@ function updateGeometry() {
 }
 
 /******************************************************
+ * System : updateUniformGrid()
+ *****************************************************/
+const grid = new Map()
+function updateUniformGrid() {
+  grid.clear()
+  for (let i = 0; i < particleCount; i++) {
+    const x = Math.floor(posX[i] / CELL_SIZE)
+    const y = Math.floor(posY[i] / CELL_SIZE)
+    const z = Math.floor(posZ[i] / CELL_SIZE)
+    const key = `${x},${y},${z}`
+    if (!grid.has(key)) {
+      grid.set(key, [])
+    }
+    grid.get(key).push(i)
+  }
+}
+
+/******************************************************
+ * System : findNeighbors()
+ *****************************************************/
+function findNeighbors(i) {
+  const x0 = Math.floor(posX[i] / CELL_SIZE)
+  const y0 = Math.floor(posY[i] / CELL_SIZE)
+  const z0 = Math.floor(posZ[i] / CELL_SIZE)
+  const neighbors = []
+  for (let x = x0 - 1; x < x0 + 2; x++) {
+    for (let y = y0 - 1; y < y0 + 2; y++) {
+      for (let z = z0 - 1; z < z0 + 2; z++) {
+        const key = `${x},${y},${z}`
+        const indexes = grid.get(key)
+        if (!indexes) continue
+
+        for (const j of indexes) {
+          if (j !== i) {
+            neighbors.push(j)
+          }
+        }
+      }
+    }
+  }
+  return neighbors
+}
+
+/******************************************************
  * System : animate()
  *****************************************************/
 const clock = new THREE.Clock()
@@ -246,6 +272,7 @@ function animate() {
   updateParticles(dt)
 
   // updateUniformGrid()
+  // findNeighbors()
 
   updateGeometry()
 
@@ -258,4 +285,10 @@ function animate() {
  * System : Execution
  *****************************************************/
 createGridParticles(900)
+updateUniformGrid()
+console.log(grid)
+
+const neighbors = findNeighbors(150)
+console.log(neighbors)
+
 animate()
