@@ -28,6 +28,12 @@ const CELL_SIZE = 0.1
 // ======================
 // Constants : Fluid Parameters
 // ======================
+const REST_DENSITY = 2.0 // 自然な密度
+const STIFFNESS = 1.0 // 圧力の強さ
+
+// Density は 1〜5程度に収まるように設計する。
+// REST_DENSITY は、初期状態の平均密度に合わせる。
+// Pressure は 0〜1程度から始め、必要に応じて STIFFNESS
 
 // ======================
 // Constants : Rendering Parameters
@@ -63,8 +69,8 @@ const colorB = new Float32Array(MAX_PARTICLES)
 // const forceY = new Float32Array(MAX_PARTICLES)
 // const forceZ = new Float32Array(MAX_PARTICLES)
 
-// const density = new Float32Array(MAX_PARTICLES)
-// const pressure = new Float32Array(MAX_PARTICLES)
+const density = new Float32Array(MAX_PARTICLES)
+const pressure = new Float32Array(MAX_PARTICLES)
 
 // Position Based Fluids
 // const lambda = new Float32Array(MAX_PARTICLES)
@@ -259,6 +265,38 @@ function findNeighbors(i) {
   return neighbors
 }
 
+function getDistanceSquared(i, j) {
+  const dx = posX[j] - posX[i]
+  const dy = posY[j] - posY[i]
+  const dz = posZ[j] - posZ[i]
+  return dx * dx + dy * dy + dz * dz
+}
+
+function calcDensity() {
+  for (let i = 0; i < particleCount; i++) {
+    density[i] = 0
+    const neighbors = findNeighbors(i)
+    let densitySum = 0
+    for (const j of neighbors) {
+      const dist = Math.sqrt(getDistanceSquared(i, j))
+      if (dist >= KERNEL_RADIUS) continue
+      densitySum += mass[j] * calcWeight(dist)
+    }
+    density[i] = densitySum
+  }
+}
+
+function calcWeight(dist) {
+  if (dist >= KERNEL_RADIUS) return 0
+  return 1 - dist / KERNEL_RADIUS
+}
+
+function calcPressure() {
+  for (let i = 0; i < particleCount; i++) {
+    pressure[i] = STIFFNESS * Math.max(0, density[i] - REST_DENSITY)
+  }
+}
+
 /******************************************************
  * System : animate()
  *****************************************************/
@@ -287,7 +325,12 @@ function animate() {
 createGridParticles(900)
 updateUniformGrid()
 
-const neighbors = findNeighbors(50)
-console.log(neighbors)
+calcDensity()
+console.log(density)
+calcPressure()
+console.log(pressure)
+
+// const neighbors = findNeighbors(50)
+// console.log(neighbors)
 
 animate()
