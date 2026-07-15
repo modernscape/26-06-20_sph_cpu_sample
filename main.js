@@ -1,5 +1,6 @@
 import * as THREE from "three"
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js"
+import { GrannyKnot } from "three/examples/jsm/curves/CurveExtras.js"
 
 /******************************************************
  * UI
@@ -24,6 +25,7 @@ const MAX_PARTICLES = 5000
 const PARTICLE_SPACING = 0.05
 const KERNEL_RADIUS = 0.1
 const CELL_SIZE = 0.1
+const GRAVITY = -0.1
 
 // ======================
 // Constants : Fluid Parameters
@@ -214,7 +216,22 @@ function createParticle(x, y, z, vx, vy, vz, r, g, b) {
 /******************************************************
  * System : updateParticles()
  *****************************************************/
-function updateParticles(dt) {}
+function updateParticles(dt) {
+  for (let i = 0; i < particleCount; i++) {
+    const totalForce_x = forceX[i] + viscosityForceX[i]
+    const totalForce_y = forceY[i] + viscosityForceY[i] + GRAVITY
+    const totalForce_z = forceZ[i] + viscosityForceZ[i]
+    const acc_x = totalForce_x / mass[i]
+    const acc_y = totalForce_y / mass[i]
+    const acc_z = totalForce_z / mass[i]
+    velX[i] += acc_x * dt
+    velY[i] += acc_y * dt
+    velZ[i] += acc_z * dt
+    posX[i] += velX[i] * dt
+    posY[i] += velY[i] * dt
+    posZ[i] += velZ[i] * dt
+  }
+}
 
 function getDistanceSquared(i, j) {
   const dx = posX[j] - posX[i]
@@ -362,12 +379,18 @@ const clock = new THREE.Clock()
 
 function animate() {
   requestAnimationFrame(animate)
+  updateUniformGrid()
+
+  calcDensity()
+  calcPressure()
+
+  for (let i = 0; i < particleCount; i++) {
+    calcPressureForce(i)
+    calcViscosityForce(i)
+  }
 
   const dt = clock.getDelta()
   updateParticles(dt)
-
-  // updateUniformGrid()
-  // findNeighbors()
 
   updateGeometry()
   controls.update()
@@ -378,18 +401,4 @@ function animate() {
  * System : Execution
  *****************************************************/
 createGridParticles(900)
-updateUniformGrid()
-
-calcDensity()
-calcPressure()
-
-for (let i = 0; i < particleCount; i++) {
-  calcPressureForce(i)
-}
-
-for (let i = 0; i < particleCount; i++) {
-  calcViscosityForce(i)
-}
-console.log(viscosityForceX.subarray(0, particleCount))
-
 animate()
