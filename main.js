@@ -65,9 +65,9 @@ const colorR = new Float32Array(MAX_PARTICLES)
 const colorG = new Float32Array(MAX_PARTICLES)
 const colorB = new Float32Array(MAX_PARTICLES)
 
-// const forceX = new Float32Array(MAX_PARTICLES)
-// const forceY = new Float32Array(MAX_PARTICLES)
-// const forceZ = new Float32Array(MAX_PARTICLES)
+const forceX = new Float32Array(MAX_PARTICLES)
+const forceY = new Float32Array(MAX_PARTICLES)
+const forceZ = new Float32Array(MAX_PARTICLES)
 
 const density = new Float32Array(MAX_PARTICLES)
 const pressure = new Float32Array(MAX_PARTICLES)
@@ -208,6 +208,72 @@ function createParticle(x, y, z, vx, vy, vz, r, g, b) {
  *****************************************************/
 function updateParticles(dt) {}
 
+function getDistanceSquared(i, j) {
+  const dx = posX[j] - posX[i]
+  const dy = posY[j] - posY[i]
+  const dz = posZ[j] - posZ[i]
+  return dx * dx + dy * dy + dz * dz
+}
+
+function calcDensity() {
+  for (let i = 0; i < particleCount; i++) {
+    density[i] = 0
+    const neighbors = findNeighbors(i)
+    let densitySum = 0
+    for (const j of neighbors) {
+      const dist = Math.sqrt(getDistanceSquared(i, j))
+      if (dist >= KERNEL_RADIUS) continue
+      densitySum += mass[j] * calcWeight(dist)
+    }
+    density[i] = densitySum
+  }
+}
+
+function calcWeight(dist) {
+  if (dist >= KERNEL_RADIUS) return 0
+  return 1 - dist / KERNEL_RADIUS
+}
+
+function calcPressure() {
+  for (let i = 0; i < particleCount; i++) {
+    pressure[i] = STIFFNESS * Math.max(0, density[i] - REST_DENSITY)
+  }
+}
+
+function getDirection(i, j) {
+  const dx = posX[j] - posX[i]
+  const dy = posY[j] - posY[i]
+  const dz = posZ[j] - posZ[i]
+  const dist = Math.sqrt(dx * dx + dy * dy + dz * dz)
+  if (dist === 0) {
+    return { nx: 0, ny: 0, nz: 0, dist: 0 }
+  }
+  return {
+    nx: dx / dist, //
+    ny: dy / dist,
+    nz: dz / dist,
+    dist: dist,
+  }
+}
+
+function calcPressureForce(i) {
+  forceX[i] = 0
+  forceY[i] = 0
+  forceZ[i] = 0
+  const neighbors = findNeighbors(i)
+  for (const j of neighbors) {
+    const pressureTerm = -(pressure[j] + pressure[i]) * 0.5
+    const direction = getDirection(i, j)
+    const weight = calcWeight(direction.dist)
+    const force_x = pressureTerm * weight * direction.nx
+    const force_y = pressureTerm * weight * direction.ny
+    const force_z = pressureTerm * weight * direction.nz
+    forceX[i] += force_x
+    forceY[i] += force_y
+    forceZ[i] += force_z
+  }
+}
+
 /******************************************************
  * System : updateGeometry()
  *****************************************************/
@@ -253,7 +319,6 @@ function findNeighbors(i) {
         const key = `${x},${y},${z}`
         const indexes = grid.get(key)
         if (!indexes) continue
-
         for (const j of indexes) {
           if (j !== i) {
             neighbors.push(j)
@@ -263,38 +328,6 @@ function findNeighbors(i) {
     }
   }
   return neighbors
-}
-
-function getDistanceSquared(i, j) {
-  const dx = posX[j] - posX[i]
-  const dy = posY[j] - posY[i]
-  const dz = posZ[j] - posZ[i]
-  return dx * dx + dy * dy + dz * dz
-}
-
-function calcDensity() {
-  for (let i = 0; i < particleCount; i++) {
-    density[i] = 0
-    const neighbors = findNeighbors(i)
-    let densitySum = 0
-    for (const j of neighbors) {
-      const dist = Math.sqrt(getDistanceSquared(i, j))
-      if (dist >= KERNEL_RADIUS) continue
-      densitySum += mass[j] * calcWeight(dist)
-    }
-    density[i] = densitySum
-  }
-}
-
-function calcWeight(dist) {
-  if (dist >= KERNEL_RADIUS) return 0
-  return 1 - dist / KERNEL_RADIUS
-}
-
-function calcPressure() {
-  for (let i = 0; i < particleCount; i++) {
-    pressure[i] = STIFFNESS * Math.max(0, density[i] - REST_DENSITY)
-  }
 }
 
 /******************************************************
@@ -326,11 +359,12 @@ createGridParticles(900)
 updateUniformGrid()
 
 calcDensity()
-console.log(density)
 calcPressure()
-console.log(pressure)
 
-// const neighbors = findNeighbors(50)
-// console.log(neighbors)
+for (let i = 0; i < particleCount; i++) {
+  calcPressureForce(i)
+}
+
+console.log(pressure.subarray(0, particleCount))
 
 animate()
