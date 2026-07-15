@@ -30,6 +30,7 @@ const CELL_SIZE = 0.1
 // ======================
 const REST_DENSITY = 2.0 // 自然な密度
 const STIFFNESS = 1.0 // 圧力の強さ
+const VISCOSITY = 0.5 // 粘性　：速度を平均化しようとする度合い
 
 // Density は 1〜5程度に収まるように設計する。
 // REST_DENSITY は、初期状態の平均密度に合わせる。
@@ -71,6 +72,13 @@ const forceZ = new Float32Array(MAX_PARTICLES)
 
 const density = new Float32Array(MAX_PARTICLES)
 const pressure = new Float32Array(MAX_PARTICLES)
+
+// Viscosity（粘性）
+const viscosity = new Float32Array(MAX_PARTICLES)
+
+const viscosityForceX = new Float32Array(MAX_PARTICLES)
+const viscosityForceY = new Float32Array(MAX_PARTICLES)
+const viscosityForceZ = new Float32Array(MAX_PARTICLES)
 
 // Position Based Fluids
 // const lambda = new Float32Array(MAX_PARTICLES)
@@ -215,29 +223,9 @@ function getDistanceSquared(i, j) {
   return dx * dx + dy * dy + dz * dz
 }
 
-function calcDensity() {
-  for (let i = 0; i < particleCount; i++) {
-    density[i] = 0
-    const neighbors = findNeighbors(i)
-    let densitySum = 0
-    for (const j of neighbors) {
-      const dist = Math.sqrt(getDistanceSquared(i, j))
-      if (dist >= KERNEL_RADIUS) continue
-      densitySum += mass[j] * calcWeight(dist)
-    }
-    density[i] = densitySum
-  }
-}
-
-function calcWeight(dist) {
+function getWeight(dist) {
   if (dist >= KERNEL_RADIUS) return 0
   return 1 - dist / KERNEL_RADIUS
-}
-
-function calcPressure() {
-  for (let i = 0; i < particleCount; i++) {
-    pressure[i] = STIFFNESS * Math.max(0, density[i] - REST_DENSITY)
-  }
 }
 
 function getDirection(i, j) {
@@ -256,21 +244,58 @@ function getDirection(i, j) {
   }
 }
 
+function calcDensity() {
+  for (let i = 0; i < particleCount; i++) {
+    density[i] = 0
+    const neighbors = getNeighbors(i)
+    let densitySum = 0
+    for (const j of neighbors) {
+      const dist = Math.sqrt(getDistanceSquared(i, j))
+      if (dist >= KERNEL_RADIUS) continue
+      densitySum += mass[j] * getWeight(dist)
+    }
+    density[i] = densitySum
+  }
+}
+
+function calcPressure() {
+  for (let i = 0; i < particleCount; i++) {
+    pressure[i] = STIFFNESS * Math.max(0, density[i] - REST_DENSITY)
+  }
+}
+
 function calcPressureForce(i) {
   forceX[i] = 0
   forceY[i] = 0
   forceZ[i] = 0
-  const neighbors = findNeighbors(i)
+  const neighbors = getNeighbors(i)
   for (const j of neighbors) {
     const pressureTerm = -(pressure[j] + pressure[i]) * 0.5
     const direction = getDirection(i, j)
-    const weight = calcWeight(direction.dist)
+    const weight = getWeight(direction.dist)
     const force_x = pressureTerm * weight * direction.nx
     const force_y = pressureTerm * weight * direction.ny
     const force_z = pressureTerm * weight * direction.nz
     forceX[i] += force_x
     forceY[i] += force_y
     forceZ[i] += force_z
+  }
+}
+
+function calcViscosityForce(i) {
+  viscosityForceX[i] = 0
+  viscosityForceY[i] = 0
+  viscosityForceZ[i] = 0
+  const neighbors = getNeighbors(i)
+  for (const j of neighbors) {
+    const dvx = velX[j] - velX[i]
+    const dvy = velY[j] - velY[i]
+    const dvz = velZ[j] - velZ[i]
+    const dist = Math.sqrt(getDistanceSquared(i, j))
+    const weight = getWeight(dist)
+    viscosityForceX[i] += VISCOSITY * dvx * weight
+    viscosityForceY[i] += VISCOSITY * dvy * weight
+    viscosityForceZ[i] += VISCOSITY * dvz * weight
   }
 }
 
@@ -306,9 +331,9 @@ function updateUniformGrid() {
 }
 
 /******************************************************
- * System : findNeighbors()
+ * System : getNeighbors()
  *****************************************************/
-function findNeighbors(i) {
+function getNeighbors(i) {
   const x0 = Math.floor(posX[i] / CELL_SIZE)
   const y0 = Math.floor(posY[i] / CELL_SIZE)
   const z0 = Math.floor(posZ[i] / CELL_SIZE)
@@ -365,6 +390,9 @@ for (let i = 0; i < particleCount; i++) {
   calcPressureForce(i)
 }
 
-console.log(pressure.subarray(0, particleCount))
+for (let i = 0; i < particleCount; i++) {
+  calcViscosityForce(i)
+}
+console.log(viscosityForceX.subarray(0, particleCount))
 
 animate()
