@@ -364,16 +364,13 @@ function animate() {
   requestAnimationFrame(animate)
 
   const dt = clock.getDelta()
-
   updateParticles(dt)
 
   // updateUniformGrid()
   // findNeighbors()
 
   updateGeometry()
-
   controls.update()
-
   renderer.render(scene, camera)
 }
 
