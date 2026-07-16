@@ -25,7 +25,7 @@ const MAX_PARTICLES = 5000
 const PARTICLE_SPACING = 0.05
 const KERNEL_RADIUS = 0.1
 const CELL_SIZE = 0.1
-const GRAVITY = -0.1
+const GRAVITY = -0.2
 
 // ======================
 // Constants : Fluid Parameters
@@ -33,6 +33,9 @@ const GRAVITY = -0.1
 const REST_DENSITY = 2.0 // 自然な密度
 const STIFFNESS = 1.0 // 圧力の強さ
 const VISCOSITY = 0.5 // 粘性　：速度を平均化しようとする度合い
+const RESTITUTION = 0.9
+// const FRICTION = 0.8
+const BOX = 0.8
 
 // Density は 1〜5程度に収まるように設計する。
 // REST_DENSITY は、初期状態の平均密度に合わせる。
@@ -230,6 +233,7 @@ function updateParticles(dt) {
     posX[i] += velX[i] * dt
     posY[i] += velY[i] * dt
     posZ[i] += velZ[i] * dt
+    checkBoundary(i)
   }
 }
 
@@ -313,6 +317,29 @@ function calcViscosityForce(i) {
     viscosityForceX[i] += VISCOSITY * dvx * weight
     viscosityForceY[i] += VISCOSITY * dvy * weight
     viscosityForceZ[i] += VISCOSITY * dvz * weight
+  }
+}
+
+function checkBoundary(i) {
+  if (posY[i] <= -BOX) {
+    posY[i] = -BOX
+    velY[i] *= -1.0 * RESTITUTION
+  }
+  if (posX[i] <= -BOX) {
+    posX[i] = -BOX
+    velX[i] *= -1.0 * RESTITUTION
+  }
+  if (posX[i] >= BOX) {
+    posX[i] = BOX
+    velX[i] *= -1.0 * RESTITUTION
+  }
+  if (posZ[i] <= -BOX) {
+    posZ[i] = -BOX
+    velZ[i] *= -1.0 * RESTITUTION
+  }
+  if (posZ[i] >= BOX) {
+    posZ[i] = BOX
+    velZ[i] *= -1.0 * RESTITUTION
   }
 }
 
