@@ -180,6 +180,7 @@ function createGridParticles(num) {
 
     const x = PARTICLE_SPACING * (col - cols * centerOffset + centerOffset)
     const z = PARTICLE_SPACING * (row - rows * centerOffset + centerOffset)
+    const y = 0
 
     createParticle(
       x, //
@@ -219,8 +220,23 @@ function createParticle(x, y, z, vx, vy, vz, r, g, b) {
 /******************************************************
  * System : updateParticles()
  *****************************************************/
+const corectionX = new Float32Array(MAX_PARTICLES)
+const corectionY = new Float32Array(MAX_PARTICLES)
+const corectionZ = new Float32Array(MAX_PARTICLES)
+
+const iteration = 1
 function updateParticles(dt) {
+  for (let j = 0; j < iteration; j++) {
+    calcPosition(dt)
+    calcConstraint()
+    correctPosition()
+  }
+}
+
+// Stage 1
+function calcPosition(dt) {
   for (let i = 0; i < particleCount; i++) {
+    // Set Position
     const totalForce_x = forceX[i] + viscosityForceX[i]
     const totalForce_y = forceY[i] + viscosityForceY[i] + GRAVITY
     const totalForce_z = forceZ[i] + viscosityForceZ[i]
@@ -234,6 +250,36 @@ function updateParticles(dt) {
     posY[i] += velY[i] * dt
     posZ[i] += velZ[i] * dt
     checkBoundary(i)
+  }
+}
+
+// Stage 2
+const correctionFactor = 0.001
+function calcConstraint() {
+  for (let i = 0; i < particleCount; i++) {
+    const neighbor = getNeighbors(i)
+    corectionX[i] = 0
+    corectionY[i] = 0
+    corectionZ[i] = 0
+    for (const j of neighbor) {
+      const direction = getDirection(i, j)
+      if (direction.dist > PARTICLE_SPACING) continue
+      const correction =
+        (Math.max(0, density[i] - REST_DENSITY) * correctionFactor) /
+        neighbor.length
+      corectionX[i] += direction.nx * correction
+      corectionY[i] += direction.ny * correction
+      corectionZ[i] += direction.nz * correction
+    }
+  }
+}
+
+// Stage 3
+function correctPosition() {
+  for (let i = 0; i < particleCount; i++) {
+    posX[i] += corectionX[i]
+    posY[i] += corectionY[i]
+    posZ[i] += corectionZ[i]
   }
 }
 
