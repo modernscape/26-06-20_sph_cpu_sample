@@ -22,7 +22,7 @@ const MAX_PARTICLES = 5000
 // ======================
 // Constants : Simulation Parameters
 // ======================
-const PARTICLE_SPACING = 0.05
+const PARTICLE_SPACING = 0.05 //0.05
 const KERNEL_RADIUS = 0.1
 const CELL_SIZE = 0.1
 const GRAVITY = -0.2
@@ -34,7 +34,6 @@ const REST_DENSITY = 2.0 // 自然な密度
 const STIFFNESS = 1.0 // 圧力の強さ
 const VISCOSITY = 0.5 // 粘性　：速度を平均化しようとする度合い
 const RESTITUTION = 0.9
-// const FRICTION = 0.8
 const BOX = 0.8
 
 // Density は 1〜5程度に収まるように設計する。
@@ -223,20 +222,58 @@ function createParticle(x, y, z, vx, vy, vz, r, g, b) {
 const corectionX = new Float32Array(MAX_PARTICLES)
 const corectionY = new Float32Array(MAX_PARTICLES)
 const corectionZ = new Float32Array(MAX_PARTICLES)
+const prevPosX = new Float32Array(MAX_PARTICLES)
+const prevPosY = new Float32Array(MAX_PARTICLES)
+const prevPosZ = new Float32Array(MAX_PARTICLES)
 
 const iteration = 1
+
 function updateParticles(dt) {
+  calcPosition(dt)
   for (let j = 0; j < iteration; j++) {
-    calcPosition(dt)
     calcConstraint()
     correctPosition()
   }
 }
 
-// Stage 1
+// function calcPosition__(dt) {
+//   for (let i = 0; i < particleCount; i++) {
+//     // 1. 前回の位置を保存
+//     const tempX = posX[i]
+//     const tempY = posY[i]
+//     const tempZ = posZ[i]
+
+//     // 2. 速度（位置の差分）を更新（慣性を考慮）
+//     // 慣性係数 damping (例: 0.99) をかけると安定します
+//     const damping = 0.99
+//     const vx = (posX[i] - prevPosX[i]) * damping
+//     const vy = (posY[i] - prevPosY[i]) * damping
+//     const vz = (posZ[i] - prevPosZ[i]) * damping
+
+//     // 3. 現在の位置を更新 (Verlet積分)
+//     // 外力(加速度)を加える
+//     const acc_x = forceX[i] / mass[i]
+//     const acc_y = (forceY[i] + GRAVITY) / mass[i]
+//     const acc_z = forceZ[i] / mass[i]
+
+//     posX[i] += vx + acc_x * dt * dt
+//     posY[i] += vy + acc_y * dt * dt
+//     posZ[i] += vz + acc_z * dt * dt
+
+//     // 4. prevPosを更新
+//     prevPosX[i] = tempX
+//     prevPosY[i] = tempY
+//     prevPosZ[i] = tempZ
+
+//     checkBoundary(i)
+//   }
+// }
+
 function calcPosition(dt) {
   for (let i = 0; i < particleCount; i++) {
-    // Set Position
+    prevPosX[i] = posX[i]
+    prevPosY[i] = posY[i]
+    prevPosZ[i] = posZ[i]
     const totalForce_x = forceX[i] + viscosityForceX[i]
     const totalForce_y = forceY[i] + viscosityForceY[i] + GRAVITY
     const totalForce_z = forceZ[i] + viscosityForceZ[i]
@@ -249,24 +286,27 @@ function calcPosition(dt) {
     posX[i] += velX[i] * dt
     posY[i] += velY[i] * dt
     posZ[i] += velZ[i] * dt
+
     checkBoundary(i)
   }
 }
 
-// Stage 2
-const correctionFactor = 0.001
+const correctionFactor = 0.00001
 function calcConstraint() {
   for (let i = 0; i < particleCount; i++) {
-    const neighbor = getNeighbors(i)
+    const neighbors = getNeighbors(i)
+    if (neighbors.length === 0) {
+    }
     corectionX[i] = 0
     corectionY[i] = 0
     corectionZ[i] = 0
-    for (const j of neighbor) {
+    for (const j of neighbors) {
       const direction = getDirection(i, j)
       if (direction.dist > PARTICLE_SPACING) continue
+
       const correction =
         (Math.max(0, density[i] - REST_DENSITY) * correctionFactor) /
-        neighbor.length
+        neighbors.length
       corectionX[i] += direction.nx * correction
       corectionY[i] += direction.ny * correction
       corectionZ[i] += direction.nz * correction
@@ -274,7 +314,6 @@ function calcConstraint() {
   }
 }
 
-// Stage 3
 function correctPosition() {
   for (let i = 0; i < particleCount; i++) {
     posX[i] += corectionX[i]
@@ -387,6 +426,7 @@ function checkBoundary(i) {
     posZ[i] = BOX
     velZ[i] *= -1.0 * RESTITUTION
   }
+  // console.log("after boundary", i, posX[i])
 }
 
 /******************************************************
