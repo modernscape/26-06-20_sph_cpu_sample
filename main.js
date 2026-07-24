@@ -207,9 +207,13 @@ function createParticle(x, y, z, vx, vy, vz, r, g, b) {
   posY[i] = y
   posZ[i] = z
 
-  velX[i] = vx
-  velY[i] = vy
-  velZ[i] = vz
+  prevPosX[i] = x
+  prevPosY[i] = y
+  prevPosZ[i] = z
+
+  // velX[i] = vx
+  // velY[i] = vy
+  // velZ[i] = vz
 
   colorR[i] = r
   colorG[i] = g
@@ -229,45 +233,49 @@ const prevPosZ = new Float32Array(MAX_PARTICLES)
 const iteration = 1
 
 function updateParticles(dt) {
-  calcPosition(dt)
+  // calcPosition(dt)
+  calcPositionVerlet(dt)
   for (let j = 0; j < iteration; j++) {
-    calcConstraint()
-    correctPosition()
+    // calcConstraint()
+    // correctPosition()
   }
 }
 
-// function calcPosition__(dt) {
-//   for (let i = 0; i < particleCount; i++) {
-//     // 1. 前回の位置を保存
-//     const tempX = posX[i]
-//     const tempY = posY[i]
-//     const tempZ = posZ[i]
+function calcPositionVerlet(dt) {
+  for (let i = 0; i < particleCount; i++) {
+    const totalForce_x = forceX[i] + viscosityForceX[i]
+    const totalForce_y = forceY[i] + viscosityForceY[i] + GRAVITY
+    const totalForce_z = forceZ[i] + viscosityForceZ[i]
 
-//     // 2. 速度（位置の差分）を更新（慣性を考慮）
-//     // 慣性係数 damping (例: 0.99) をかけると安定します
-//     const damping = 0.99
-//     const vx = (posX[i] - prevPosX[i]) * damping
-//     const vy = (posY[i] - prevPosY[i]) * damping
-//     const vz = (posZ[i] - prevPosZ[i]) * damping
+    const accX = totalForce_x / mass[i]
+    const accY = totalForce_y / mass[i]
+    const accZ = totalForce_z / mass[i]
 
-//     // 3. 現在の位置を更新 (Verlet積分)
-//     // 外力(加速度)を加える
-//     const acc_x = forceX[i] / mass[i]
-//     const acc_y = (forceY[i] + GRAVITY) / mass[i]
-//     const acc_z = forceZ[i] / mass[i]
+    const oldPosX = posX[i]
+    const oldPosY = posY[i]
+    const oldPosZ = posZ[i]
 
-//     posX[i] += vx + acc_x * dt * dt
-//     posY[i] += vy + acc_y * dt * dt
-//     posZ[i] += vz + acc_z * dt * dt
+    const nextPosX = 2 * posX[i] - prevPosX[i] + accX * dt * dt
+    const nextPosY = 2 * posY[i] - prevPosY[i] + accY * dt * dt
+    const nextPosZ = 2 * posZ[i] - prevPosZ[i] + accZ * dt * dt
 
-//     // 4. prevPosを更新
-//     prevPosX[i] = tempX
-//     prevPosY[i] = tempY
-//     prevPosZ[i] = tempZ
+    prevPosX[i] = oldPosX
+    prevPosY[i] = oldPosY
+    prevPosZ[i] = oldPosZ
 
-//     checkBoundary(i)
-//   }
-// }
+    posX[i] = nextPosX
+    posY[i] = nextPosY
+    posZ[i] = nextPosZ
+
+    checkBoundary(i)
+
+    // 壁で位置を変更したら prevPos も合わせる
+    // （まずは簡単な方法）
+    if (posX[i] === BOX || posX[i] === -BOX) prevPosX[i] = posX[i]
+    if (posY[i] === BOX || posY[i] === -BOX) prevPosY[i] = posY[i]
+    if (posZ[i] === BOX || posZ[i] === -BOX) prevPosZ[i] = posZ[i]
+  }
+}
 
 function calcPosition(dt) {
   for (let i = 0; i < particleCount; i++) {
@@ -408,25 +416,29 @@ function calcViscosityForce(i) {
 function checkBoundary(i) {
   if (posY[i] <= -BOX) {
     posY[i] = -BOX
-    velY[i] *= -1.0 * RESTITUTION
+    prevPosY[i] = -BOX
+    // velY[i] *= -1.0 * RESTITUTION
   }
   if (posX[i] <= -BOX) {
     posX[i] = -BOX
-    velX[i] *= -1.0 * RESTITUTION
+    prevPosX[i] = -BOX
+    // velX[i] *= -1.0 * RESTITUTION
   }
   if (posX[i] >= BOX) {
     posX[i] = BOX
-    velX[i] *= -1.0 * RESTITUTION
+    prevPosX[i] = BOX
+    // velX[i] *= -1.0 * RESTITUTION
   }
   if (posZ[i] <= -BOX) {
     posZ[i] = -BOX
-    velZ[i] *= -1.0 * RESTITUTION
+    prevPosZ[i] = -BOX
+    // velZ[i] *= -1.0 * RESTITUTION
   }
   if (posZ[i] >= BOX) {
     posZ[i] = BOX
-    velZ[i] *= -1.0 * RESTITUTION
+    prevPosZ[i] = BOX
+    // velZ[i] *= -1.0 * RESTITUTION
   }
-  // console.log("after boundary", i, posX[i])
 }
 
 /******************************************************
