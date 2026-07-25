@@ -243,13 +243,13 @@ function updateParticles(dt) {
 
 function calcPositionVerlet(dt) {
   for (let i = 0; i < particleCount; i++) {
-    const totalForce_x = forceX[i] + viscosityForceX[i]
-    const totalForce_y = forceY[i] + viscosityForceY[i] + GRAVITY
-    const totalForce_z = forceZ[i] + viscosityForceZ[i]
+    const totalForceX = forceX[i] + viscosityForceX[i]
+    const totalForceY = forceY[i] + viscosityForceY[i] + GRAVITY
+    const totalForceZ = forceZ[i] + viscosityForceZ[i]
 
-    const accX = totalForce_x / mass[i]
-    const accY = totalForce_y / mass[i]
-    const accZ = totalForce_z / mass[i]
+    const accX = totalForceX / mass[i]
+    const accY = totalForceY / mass[i]
+    const accZ = totalForceZ / mass[i]
 
     const oldPosX = posX[i]
     const oldPosY = posY[i]
@@ -277,27 +277,27 @@ function calcPositionVerlet(dt) {
   }
 }
 
-function calcPosition(dt) {
-  for (let i = 0; i < particleCount; i++) {
-    prevPosX[i] = posX[i]
-    prevPosY[i] = posY[i]
-    prevPosZ[i] = posZ[i]
-    const totalForce_x = forceX[i] + viscosityForceX[i]
-    const totalForce_y = forceY[i] + viscosityForceY[i] + GRAVITY
-    const totalForce_z = forceZ[i] + viscosityForceZ[i]
-    const acc_x = totalForce_x / mass[i]
-    const acc_y = totalForce_y / mass[i]
-    const acc_z = totalForce_z / mass[i]
-    velX[i] += acc_x * dt
-    velY[i] += acc_y * dt
-    velZ[i] += acc_z * dt
-    posX[i] += velX[i] * dt
-    posY[i] += velY[i] * dt
-    posZ[i] += velZ[i] * dt
+// function calcPosition(dt) {
+//   for (let i = 0; i < particleCount; i++) {
+//     prevPosX[i] = posX[i]
+//     prevPosY[i] = posY[i]
+//     prevPosZ[i] = posZ[i]
+//     const totalForce_x = forceX[i] + viscosityForceX[i]
+//     const totalForce_y = forceY[i] + viscosityForceY[i] + GRAVITY
+//     const totalForce_z = forceZ[i] + viscosityForceZ[i]
+//     const acc_x = totalForce_x / mass[i]
+//     const acc_y = totalForce_y / mass[i]
+//     const acc_z = totalForce_z / mass[i]
+//     velX[i] += acc_x * dt
+//     velY[i] += acc_y * dt
+//     velZ[i] += acc_z * dt
+//     posX[i] += velX[i] * dt
+//     posY[i] += velY[i] * dt
+//     posZ[i] += velZ[i] * dt
 
-    checkBoundary(i)
-  }
-}
+//     checkBoundary(i)
+//   }
+// }
 
 const correctionFactor = 0.00001
 function calcConstraint() {
@@ -416,28 +416,27 @@ function calcViscosityForce(i) {
 function checkBoundary(i) {
   if (posY[i] <= -BOX) {
     posY[i] = -BOX
-    prevPosY[i] = -BOX
-    // velY[i] *= -1.0 * RESTITUTION
+    prevPosY[i] = posY[i]
+  }
+  if (posY[i] >= BOX) {
+    posY[i] = BOX
+    prevPosY[i] = posY[i]
   }
   if (posX[i] <= -BOX) {
     posX[i] = -BOX
-    prevPosX[i] = -BOX
-    // velX[i] *= -1.0 * RESTITUTION
+    prevPosX[i] = posX[i]
   }
   if (posX[i] >= BOX) {
     posX[i] = BOX
-    prevPosX[i] = BOX
-    // velX[i] *= -1.0 * RESTITUTION
+    prevPosX[i] = posX[i]
   }
   if (posZ[i] <= -BOX) {
     posZ[i] = -BOX
-    prevPosZ[i] = -BOX
-    // velZ[i] *= -1.0 * RESTITUTION
+    prevPosZ[i] = posZ[i]
   }
   if (posZ[i] >= BOX) {
     posZ[i] = BOX
-    prevPosZ[i] = BOX
-    // velZ[i] *= -1.0 * RESTITUTION
+    prevPosZ[i] = posZ[i]
   }
 }
 
@@ -511,7 +510,7 @@ function animate() {
 
   for (let i = 0; i < particleCount; i++) {
     calcPressureForce(i)
-    calcViscosityForce(i)
+    // calcViscosityForce(i)
   }
 
   const dt = clock.getDelta()
