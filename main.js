@@ -207,13 +207,9 @@ function createParticle(x, y, z, vx, vy, vz, r, g, b) {
   posY[i] = y
   posZ[i] = z
 
-  prevPosX[i] = x
-  prevPosY[i] = y
-  prevPosZ[i] = z
-
-  // velX[i] = vx
-  // velY[i] = vy
-  // velZ[i] = vz
+  prevPosX[i] = posX[i]
+  prevPosY[i] = posY[i]
+  prevPosZ[i] = posZ[i]
 
   colorR[i] = r
   colorG[i] = g
@@ -233,11 +229,15 @@ const prevPosZ = new Float32Array(MAX_PARTICLES)
 const iteration = 1
 
 function updateParticles(dt) {
-  // calcPosition(dt)
   calcPositionVerlet(dt)
+
+  calcDensity()
+
   for (let j = 0; j < iteration; j++) {
-    // calcConstraint()
-    // correctPosition()
+    calcConstraint()
+    correctPosition()
+
+    calcDensity()
   }
 }
 
@@ -505,13 +505,13 @@ function animate() {
   requestAnimationFrame(animate)
   updateUniformGrid()
 
-  calcDensity()
-  calcPressure()
+  // calcDensity()
+  // calcPressure()
 
-  for (let i = 0; i < particleCount; i++) {
-    calcPressureForce(i)
-    // calcViscosityForce(i)
-  }
+  // for (let i = 0; i < particleCount; i++) {
+  //   calcPressureForce(i)
+  //   calcViscosityForce(i)
+  // }
 
   const dt = clock.getDelta()
   updateParticles(dt)
